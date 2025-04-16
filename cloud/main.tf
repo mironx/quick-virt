@@ -15,16 +15,6 @@ variable "vm_name" {
   default = "vm_test_1"
 }
 
-variable "vm_instance_id" {
-  type = string
-  default = "vm_test_1"
-}
-
-variable "vm_local_hostname" {
-  type = string
-  default = "vm_test_1"
-}
-
 variable "vm_image_source"{
   type = string
   default = "/var/lib/libvirt/images/ubuntu-2204.qcow2"
@@ -40,10 +30,11 @@ variable "vm_memory" {
   default = 2048
 }
 
-variable "vm_local_network" {
-  type = list(string)
-  default = ["192.168.100.0/24"]
+variable "local_network_name" {
+  type = string
+  default = "local-network"
 }
+
 
 //-------------------------------------------------------------------------------
 
@@ -54,25 +45,18 @@ resource "libvirt_volume" "vm-disk" {
   format = "qcow2"
 }
 
-resource "libvirt_network" "local-network" {
-  name      = "terraform-net"
-  mode      = "nat"
-  domain    = "local"
-  addresses = var.vm_local_network
-  autostart = true
-}
 
 data "template_file" "meta_data" {
-  template = file("${path.module}/meta-data.tmpl")
+  template = file("${path.module}/templates/meta-data.tmpl")
   vars = {
-    instance_id     = var.vm_instance_id
-    local_hostname  = var.vm_local_hostname
+    instance_id     = var.vm_name
+    local_hostname  = var.vm_name
   }
 }
 
 resource "libvirt_cloudinit_disk" "cloudinit" {
   name           = "${var.vm_name}_cloudinit.iso"
-  user_data      = file("${path.module}/user-data.yaml")
+  user_data      = file("${path.module}/templates/user-data.yaml")
   meta_data      = data.template_file.meta_data.rendered
   pool           = "default"
 }
@@ -90,7 +74,7 @@ resource "libvirt_domain" "vm" {
   cloudinit = libvirt_cloudinit_disk.cloudinit.id
 
   network_interface {
-    network_name = libvirt_network.local-network.name
+    network_name = var.local_network_name
   }
 
   console {
@@ -107,6 +91,5 @@ resource "libvirt_domain" "vm" {
   depends_on = [    
     libvirt_volume.vm-disk,
     libvirt_cloudinit_disk.cloudinit,
-    libvirt_network.local-network
   ]
 }
