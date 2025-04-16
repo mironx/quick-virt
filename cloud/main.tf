@@ -35,6 +35,15 @@ variable "local_network_name" {
   default = "local-network"
 }
 
+variable "user_name" {
+  type = string
+  default = "devx"
+}
+
+variable "user_password" {
+  type = string
+  default = "abc"
+}
 
 //-------------------------------------------------------------------------------
 
@@ -56,6 +65,11 @@ data "template_file" "meta_data" {
 
 data "template_file" "user_data" {
   template = file("${path.module}/templates/user-data.tmpl")
+  vars = {
+    local_hostname  = var.vm_name
+    user_name = var.user_name
+    user_password = var.user_password
+  }
 }
 
 resource "libvirt_cloudinit_disk" "cloudinit" {
