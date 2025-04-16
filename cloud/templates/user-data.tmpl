@@ -1,14 +1,14 @@
 #cloud-config
-hostname: ubuntu-vm
+hostname: ${local_hostname}
 users:
-  - name: ubuntu
+  - name: ${user_name}
     groups: sudo
     shell: /bin/bash
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
     lock_passwd: false
-    plain_text_passwd: 'abc'  # Można, ale niezalecane
+    plain_text_passwd: '${user_password}'
     ssh_pwauth: true
 chpasswd:
   list: |
-    ubuntu:abc
+    ${user_name}:${user_password}
   expire: false
