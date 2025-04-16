@@ -54,9 +54,13 @@ data "template_file" "meta_data" {
   }
 }
 
+data "template_file" "user_data" {
+  template = file("${path.module}/templates/user-data.tmpl")
+}
+
 resource "libvirt_cloudinit_disk" "cloudinit" {
   name           = "${var.vm_name}_cloudinit.iso"
-  user_data      = file("${path.module}/templates/user-data.yaml")
+  user_data      = data.template_file.user_data.rendered
   meta_data      = data.template_file.meta_data.rendered
   pool           = "default"
 }
