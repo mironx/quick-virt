@@ -40,9 +40,10 @@ variable "user_name" {
   default = "devx"
 }
 
-variable "user_password" {
-  type = string
-  default = "abc"
+
+//----
+locals {
+  user_password = trimspace(file("${path.module}/pswd"))
 }
 
 //-------------------------------------------------------------------------------
@@ -68,7 +69,7 @@ data "template_file" "user_data" {
   vars = {
     local_hostname  = var.vm_name
     user_name = var.user_name
-    user_password = var.user_password
+    user_password = local.user_password
   }
 }
 
