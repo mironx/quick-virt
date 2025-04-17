@@ -66,7 +66,20 @@ locals {
     gateway4 = var.local_network_configuration.gateway4,
     nameservers = var.local_network_configuration.nameservers
   })
+
+  user_data = templatefile("${path.module}/templates/user-data.tmpl", {
+    local_hostname  = var.vm_name
+    user_name = var.user_name
+    user_password = local.user_password
+  })
+
+  meta_data = templatefile("${path.module}/templates/user-data.tmpl", {
+    local_hostname  = var.vm_name
+    user_name = var.user_name
+    user_password = local.user_password
+  })
 }
+
 //-------------------------------------------------------------------------------
 
 resource "libvirt_volume" "vm-disk" {
@@ -76,29 +89,11 @@ resource "libvirt_volume" "vm-disk" {
   format = "qcow2"
 }
 
-
-data "template_file" "meta_data" {
-  template = file("${path.module}/templates/meta-data.tmpl")
-  vars = {
-    instance_id     = var.vm_name
-    local_hostname  = var.vm_name
-  }
-}
-
-data "template_file" "user_data" {
-  template = file("${path.module}/templates/user-data.tmpl")
-  vars = {
-    local_hostname  = var.vm_name
-    user_name = var.user_name
-    user_password = local.user_password
-  }
-}
-
 resource "libvirt_cloudinit_disk" "cloudinit" {
   name           = "${var.vm_name}_cloudinit.iso"
   network_config = local.network_config
-  user_data      = data.template_file.user_data.rendered
-  meta_data      = data.template_file.meta_data.rendered
+  user_data      = local.user_data
+  meta_data      = local.meta_data
   pool           = "default"
 }
 
