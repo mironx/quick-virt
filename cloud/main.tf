@@ -30,20 +30,57 @@ variable "vm_memory" {
   default = 2048
 }
 
-variable "local_network_name" {
-  type = string
-  default = "local-network"
-}
-
 variable "user_name" {
   type = string
   default = "devx"
 }
 
 
-//----
+// local_network_name = "local-network"
+// local_network_addresses = ["192.168.100.0/24"]
+variable "local_network_configuration" {
+  type = object({
+    is_enabled = bool
+    name = string
+    ip = string
+    mask = string
+    gateway4 = string
+    nameservers = list(string)
+  })
+  default = {
+    is_enabled = true
+    name = "local-network"
+    ip = "192.168.100.15"
+    mask = "24"
+    gateway4 = "192.168.100.1"
+    nameservers = ["1.1.1.1", "8.8.8.8"]
+  }
+}
+
+
+//-------------------------------------------------------------------------------
 locals {
   user_password = trimspace(file("${path.module}/pswd"))
+
+  network_config = templatefile("${path.module}/templates/network-config.tmpl", {
+    is_enabled = var.local_network_configuration.is_enabled,
+    local_network_ip = var.local_network_configuration.ip,
+    local_network_mask = var.local_network_configuration.mask,
+    local_network_gateway4 = var.local_network_configuration.gateway4,
+    local_network_nameservers = var.local_network_configuration.nameservers
+  })
+
+  user_data = templatefile("${path.module}/templates/user-data.tmpl", {
+    local_hostname  = var.vm_name
+    user_name = var.user_name
+    user_password = local.user_password
+  })
+
+  meta_data = templatefile("${path.module}/templates/user-data.tmpl", {
+    local_hostname  = var.vm_name
+    user_name = var.user_name
+    user_password = local.user_password
+  })
 }
 
 //-------------------------------------------------------------------------------
@@ -55,31 +92,13 @@ resource "libvirt_volume" "vm-disk" {
   format = "qcow2"
 }
 
-
-data "template_file" "meta_data" {
-  template = file("${path.module}/templates/meta-data.tmpl")
-  vars = {
-    instance_id     = var.vm_name
-    local_hostname  = var.vm_name
-  }
-}
-
-data "template_file" "user_data" {
-  template = file("${path.module}/templates/user-data.tmpl")
-  vars = {
-    local_hostname  = var.vm_name
-    user_name = var.user_name
-    user_password = local.user_password
-  }
-}
-
 resource "libvirt_cloudinit_disk" "cloudinit" {
   name           = "${var.vm_name}_cloudinit.iso"
-  user_data      = data.template_file.user_data.rendered
-  meta_data      = data.template_file.meta_data.rendered
+  network_config = local.network_config
+  user_data      = local.user_data
+  meta_data      = local.meta_data
   pool           = "default"
 }
-
 
 resource "libvirt_domain" "vm" {
   name   = var.vm_name
@@ -92,9 +111,15 @@ resource "libvirt_domain" "vm" {
 
   cloudinit = libvirt_cloudinit_disk.cloudinit.id
 
-  network_interface {
-    network_name = var.local_network_name
+  dynamic "network_interface" {
+    for_each = var.local_network_configuration.is_enabled ? [1] : []
+    content {
+      network_name = var.local_network_configuration.name
+    }
   }
+
+  # see: https://github.com/dmacvicar/terraform-provider-libvirt/blob/main/examples/v0.13/ubuntu/ubuntu-example.tf
+  # why we have double console (it is some bug in cloud init)
 
   console {
     type        = "pty"
@@ -102,11 +127,18 @@ resource "libvirt_domain" "vm" {
     target_type = "serial"
   }
 
-  graphics {
-    type = "spice"
-    listen_type = "none"
+  console {
+    type        = "pty"
+    target_type = "virtio"
+    target_port = "1"
   }
-  
+
+  graphics {
+    type        = "spice"
+    listen_type = "address"
+    autoport    = true
+  }
+
   depends_on = [    
     libvirt_volume.vm-disk,
     libvirt_cloudinit_disk.cloudinit,
