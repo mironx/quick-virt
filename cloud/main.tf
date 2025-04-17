@@ -35,10 +35,9 @@ variable "user_name" {
   default = "devx"
 }
 
-//
+
 // local_network_name = "local-network"
 // local_network_addresses = ["192.168.100.0/24"]
-
 variable "local_network_configuration" {
   type = object({
     name = string
@@ -49,7 +48,7 @@ variable "local_network_configuration" {
   })
   default = {
     name = "local-network"
-    ip = "192.168.100.11"
+    ip = "192.168.100.13"
     mask = "24"
     gateway4 = "192.168.1.1"
     nameservers = ["1.1.1.1", "8.8.8.8"]
@@ -95,7 +94,6 @@ data "template_file" "network-config" {
       mask = var.local_network_configuration.mask,
       gateway4 = var.local_network_configuration.gateway4
       nameservers = join("\n", [for ns in var.local_network_configuration.nameservers : "        - ${ns}"])
-      //nameservers = join(", ", [for ns in var.local_network_configuration.nameservers : "\"${ns}\""])
   }
 }
 
@@ -119,13 +117,14 @@ resource "libvirt_domain" "vm" {
 
   cloudinit = libvirt_cloudinit_disk.cloudinit.id
 
-  # network_interface {
-  #   network_name = "default"
-  # }
   network_interface {
     network_name = var.local_network_configuration.name
     addresses = [var.local_network_configuration.ip]
   }
+
+  # see: https://github.com/dmacvicar/terraform-provider-libvirt/blob/main/examples/v0.13/ubuntu/ubuntu-example.tf
+  # why we have double console
+  # it is some bug, it unblock creating network?
 
   console {
     type        = "pty"
@@ -133,11 +132,18 @@ resource "libvirt_domain" "vm" {
     target_type = "serial"
   }
 
-  graphics {
-    type = "spice"
-    listen_type = "none"
+  console {
+    type        = "pty"
+    target_type = "virtio"
+    target_port = "1"
   }
-  
+
+  graphics {
+    type        = "spice"
+    listen_type = "address"
+    autoport    = true
+  }
+
   depends_on = [    
     libvirt_volume.vm-disk,
     libvirt_cloudinit_disk.cloudinit,
