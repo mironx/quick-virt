@@ -1,4 +1,5 @@
 version: 2
+%{ if is_enabled }
 ethernets:
   ens3:
     addresses:
@@ -11,3 +12,4 @@ ethernets:
 %{ for ns in local_network_nameservers ~}
         - ${ns}
 %{ endfor ~}
+%{ endif }

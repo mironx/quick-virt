@@ -40,6 +40,7 @@ variable "user_name" {
 // local_network_addresses = ["192.168.100.0/24"]
 variable "local_network_configuration" {
   type = object({
+    is_enabled = bool
     name = string
     ip = string
     mask = string
@@ -47,6 +48,7 @@ variable "local_network_configuration" {
     nameservers = list(string)
   })
   default = {
+    is_enabled = true
     name = "local-network"
     ip = "192.168.100.15"
     mask = "24"
@@ -61,6 +63,7 @@ locals {
   user_password = trimspace(file("${path.module}/pswd"))
 
   network_config = templatefile("${path.module}/templates/network-config.tmpl", {
+    is_enabled = var.local_network_configuration.is_enabled,
     local_network_ip = var.local_network_configuration.ip,
     local_network_mask = var.local_network_configuration.mask,
     local_network_gateway4 = var.local_network_configuration.gateway4,
@@ -108,8 +111,11 @@ resource "libvirt_domain" "vm" {
 
   cloudinit = libvirt_cloudinit_disk.cloudinit.id
 
-  network_interface {
-    network_name = var.local_network_configuration.name
+  dynamic "network_interface" {
+    for_each = var.local_network_configuration.is_enabled ? [1] : []
+    content {
+      network_name = var.local_network_configuration.name
+    }
   }
 
   # see: https://github.com/dmacvicar/terraform-provider-libvirt/blob/main/examples/v0.13/ubuntu/ubuntu-example.tf
