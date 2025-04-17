@@ -2,12 +2,12 @@ version: 2
 ethernets:
   ens3:
     addresses:
-      - ${ip}/${mask}
+      - ${local_network_ip}/${local_network_mask}
     routes:
       - to: default
-        via: ${gateway4}
+        via: ${local_network_gateway4}
     nameservers:
       addresses:
-%{ for ns in nameservers ~}
+%{ for ns in local_network_nameservers ~}
         - ${ns}
 %{ endfor ~}

@@ -61,10 +61,10 @@ locals {
   user_password = trimspace(file("${path.module}/pswd"))
 
   network_config = templatefile("${path.module}/templates/network-config.tmpl", {
-    ip = var.local_network_configuration.ip,
-    mask = var.local_network_configuration.mask,
-    gateway4 = var.local_network_configuration.gateway4,
-    nameservers = var.local_network_configuration.nameservers
+    local_network_ip = var.local_network_configuration.ip,
+    local_network_mask = var.local_network_configuration.mask,
+    local_network_gateway4 = var.local_network_configuration.gateway4,
+    local_network_nameservers = var.local_network_configuration.nameservers
   })
 
   user_data = templatefile("${path.module}/templates/user-data.tmpl", {
