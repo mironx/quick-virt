@@ -48,9 +48,9 @@ variable "local_network_configuration" {
   })
   default = {
     name = "local-network"
-    ip = "192.168.100.13"
+    ip = "192.168.100.15"
     mask = "24"
-    gateway4 = "192.168.1.1"
+    gateway4 = "192.168.100.1"
     nameservers = ["1.1.1.1", "8.8.8.8"]
   }
 }
@@ -59,6 +59,13 @@ variable "local_network_configuration" {
 //-------------------------------------------------------------------------------
 locals {
   user_password = trimspace(file("${path.module}/pswd"))
+
+  network_config = templatefile("${path.module}/templates/network-config.tmpl", {
+    ip = var.local_network_configuration.ip,
+    mask = var.local_network_configuration.mask,
+    gateway4 = var.local_network_configuration.gateway4,
+    nameservers = var.local_network_configuration.nameservers
+  })
 }
 //-------------------------------------------------------------------------------
 
@@ -87,24 +94,13 @@ data "template_file" "user_data" {
   }
 }
 
-data "template_file" "network-config" {
-  template =  file("${path.module}/templates/network-config.tmpl")
-  vars = {
-      ip = var.local_network_configuration.ip,
-      mask = var.local_network_configuration.mask,
-      gateway4 = var.local_network_configuration.gateway4
-      nameservers = join("\n", [for ns in var.local_network_configuration.nameservers : "        - ${ns}"])
-  }
-}
-
 resource "libvirt_cloudinit_disk" "cloudinit" {
   name           = "${var.vm_name}_cloudinit.iso"
-  network_config = data.template_file.network-config.rendered
+  network_config = local.network_config
   user_data      = data.template_file.user_data.rendered
   meta_data      = data.template_file.meta_data.rendered
   pool           = "default"
 }
-
 
 resource "libvirt_domain" "vm" {
   name   = var.vm_name
@@ -119,12 +115,10 @@ resource "libvirt_domain" "vm" {
 
   network_interface {
     network_name = var.local_network_configuration.name
-    addresses = [var.local_network_configuration.ip]
   }
 
   # see: https://github.com/dmacvicar/terraform-provider-libvirt/blob/main/examples/v0.13/ubuntu/ubuntu-example.tf
-  # why we have double console
-  # it is some bug, it unblock creating network?
+  # why we have double console (it is some bug in cloud init)
 
   console {
     type        = "pty"

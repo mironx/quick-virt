@@ -2,7 +2,12 @@ version: 2
 ethernets:
   ens3:
     addresses:
-      - {{ ip }}/{{ mask}}
-    gateway4: {{ gateway4 }}
+      - ${ip}/${mask}
+    routes:
+      - to: default
+        via: ${gateway4}
     nameservers:
-{{ nameservers }}
+      addresses:
+%{ for ns in nameservers ~}
+        - ${ns}
+%{ endfor ~}
