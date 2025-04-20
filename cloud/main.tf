@@ -57,6 +57,28 @@ variable "local_network_configuration" {
   }
 }
 
+// Bridge network configuration
+variable "bridge_network_configuration" {
+  type = object({
+    is_enabled = bool
+    name = string
+    interface = string
+    ip = string
+    mask = string
+    gateway4 = string
+    nameservers = list(string)
+  })
+  default = {
+    is_enabled = true
+    name = "bridge-network"
+    interface = "enp0s25"
+    ip = "172.16.0.15"
+    mask = "12"
+    gateway4 = "172.16.0.1"
+    nameservers = ["172.16.0.1"]
+  }
+}
+
 
 //-------------------------------------------------------------------------------
 locals {
@@ -68,6 +90,13 @@ locals {
     local_network_mask = var.local_network_configuration.mask,
     local_network_gateway4 = var.local_network_configuration.gateway4,
     local_network_nameservers = var.local_network_configuration.nameservers
+
+    bridge_is_enabled = var.bridge_network_configuration.is_enabled,
+    //bridge_interface = var.bridge_network_configuration.interface,
+    bridge_network_ip = var.bridge_network_configuration.ip,
+    bridge_network_mask = var.bridge_network_configuration.mask,
+    bridge_network_gateway4 = var.bridge_network_configuration.gateway4,
+    bridge_network_nameservers = var.bridge_network_configuration.nameservers
   })
 
   user_data = templatefile("${path.module}/templates/user-data.tmpl", {
@@ -117,6 +146,14 @@ resource "libvirt_domain" "vm" {
       network_name = var.local_network_configuration.name
     }
   }
+
+  dynamic "network_interface" {
+    for_each = var.bridge_network_configuration.is_enabled ? [1] : []
+    content {
+      network_name = var.bridge_network_configuration.name
+    }
+  }
+
 
   # see: https://github.com/dmacvicar/terraform-provider-libvirt/blob/main/examples/v0.13/ubuntu/ubuntu-example.tf
   # why we have double console (it is some bug in cloud init)
