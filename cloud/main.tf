@@ -17,7 +17,7 @@ variable "vm_name" {
 
 variable "vm_image_source"{
   type = string
-  default = "/var/lib/libvirt/images/ubuntu-2204.qcow2"
+  default = "/var/lib/libvirt/images/ubuntu-2204.qcow2.base"
 }
 
 variable "vm_vcpu" {

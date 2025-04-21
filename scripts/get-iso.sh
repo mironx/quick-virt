@@ -3,7 +3,7 @@
 set -euo pipefail
 
 IMAGE_URL="https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
-IMAGE_NAME="ubuntu-2204.qcow2"
+IMAGE_NAME="ubuntu-2204.qcow2.base"
 TARGET_DIR="/var/lib/libvirt/images"
 TARGET_PATH="$TARGET_DIR/$IMAGE_NAME"
 
