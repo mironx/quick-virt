@@ -48,7 +48,7 @@ variable "local_network_configuration" {
     nameservers = list(string)
   })
   default = {
-    is_enabled = true
+    is_enabled = false
     name = "local-network"
     ip = "192.168.100.15"
     mask = "24"
@@ -80,8 +80,9 @@ variable "bridge_network_configuration" {
 
 //-------------------------------------------------------------------------------
 locals {
+
   interface_network1 = "ens3"
-  interface_network2 = "ens4"
+  interface_network2 = var.local_network_configuration.is_enabled ? "ens4" : "ens3"
   user_password = trimspace(file("${path.module}/pswd"))
 
   network_config = templatefile("${path.module}/templates/network-config.tmpl", {
