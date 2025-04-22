@@ -1,6 +1,6 @@
 version: 2
-%{ if is_enabled }
 ethernets:
+%{ if is_enabled }
   ens3:
     addresses:
       - ${local_network_ip}/${local_network_mask}
