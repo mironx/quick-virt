@@ -62,7 +62,6 @@ variable "bridge_network_configuration" {
   type = object({
     is_enabled = bool
     name = string
-    interface = string
     ip = string
     mask = string
     gateway4 = string
@@ -71,7 +70,6 @@ variable "bridge_network_configuration" {
   default = {
     is_enabled = true
     name = "bridge-network"
-    interface = "enp0s25"
     ip = "172.16.0.15"
     mask = "12"
     gateway4 = "172.16.0.1"
@@ -92,7 +90,6 @@ locals {
     local_network_nameservers = var.local_network_configuration.nameservers
 
     bridge_is_enabled = var.bridge_network_configuration.is_enabled,
-    //bridge_interface = var.bridge_network_configuration.interface,
     bridge_network_ip = var.bridge_network_configuration.ip,
     bridge_network_mask = var.bridge_network_configuration.mask,
     bridge_network_gateway4 = var.bridge_network_configuration.gateway4,
@@ -151,6 +148,8 @@ resource "libvirt_domain" "vm" {
     for_each = var.bridge_network_configuration.is_enabled ? [1] : []
     content {
       network_name = var.bridge_network_configuration.name
+      bridge = "br0"
+
     }
   }
 

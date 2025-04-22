@@ -14,9 +14,8 @@ locals {
   local_network_name = "local-network"
   local_network_addresses = ["192.168.100.0/24"]
   bridge_network_name = "bridge-network"
-  bridge_network_interface = "enp0s25"
+  bridge_network_interface = "br0"
   bridge_network_addresses = ["172.16.0.0/12"]
-  bridge_network_domain = "bridge.local"
 }
 
 resource "libvirt_network" "local-network" {
