@@ -80,15 +80,19 @@ variable "bridge_network_configuration" {
 
 //-------------------------------------------------------------------------------
 locals {
+  interface_network1 = "ens3"
+  interface_network2 = "ens4"
   user_password = trimspace(file("${path.module}/pswd"))
 
   network_config = templatefile("${path.module}/templates/network-config.tmpl", {
-    is_enabled = var.local_network_configuration.is_enabled,
+    interface_network1 = local.interface_network1
+    local_is_enabled = var.local_network_configuration.is_enabled,
     local_network_ip = var.local_network_configuration.ip,
     local_network_mask = var.local_network_configuration.mask,
     local_network_gateway4 = var.local_network_configuration.gateway4,
     local_network_nameservers = var.local_network_configuration.nameservers
 
+    interface_network2 = local.interface_network2
     bridge_is_enabled = var.bridge_network_configuration.is_enabled,
     bridge_network_ip = var.bridge_network_configuration.ip,
     bridge_network_mask = var.bridge_network_configuration.mask,

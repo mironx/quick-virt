@@ -1,7 +1,7 @@
 version: 2
 ethernets:
-%{ if is_enabled }
-  ens3:
+%{ if local_is_enabled }
+  ${interface_network1}:
     addresses:
       - ${local_network_ip}/${local_network_mask}
     routes:
@@ -14,7 +14,7 @@ ethernets:
 %{ endfor ~}
 %{ endif }
 %{ if bridge_is_enabled }
-  ens4:
+  ${interface_network2}:
     addresses:
       - ${bridge_network_ip}/${bridge_network_mask}
     routes:
