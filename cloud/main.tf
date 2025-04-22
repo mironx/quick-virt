@@ -35,6 +35,11 @@ variable "user_name" {
   default = "devx"
 }
 
+variable "network_desc_order" {
+  type    = bool
+  default = false
+}
+
 
 // local_network_name = "local-network"
 // local_network_addresses = ["192.168.100.0/24"]
@@ -230,22 +235,45 @@ resource "libvirt_domain" "vm" {
 
   cloudinit = libvirt_cloudinit_disk.cloudinit.id
 
+  # ------------------------------------------------------------------------------------------
+  # Network interfaces are ordered differently based on network_desc_order variable
+  # If network_desc_order is false, local network interface is first
+  # If network_desc_order is true, bridge network interface is first
   dynamic "network_interface" {
-    for_each = var.local_network_configuration.is_enabled ? [1] : []
+    for_each = !var.network_desc_order && var.local_network_configuration.is_enabled ? [1] : []
     content {
       network_name = local.local_network_name
     }
   }
 
   dynamic "network_interface" {
-    for_each = var.bridge_network_configuration.is_enabled ? [1] : []
+    for_each = !var.network_desc_order && var.bridge_network_configuration.is_enabled ? [1] : []
     content {
       network_name = local.bridge_network_name
       bridge = "br0"
+    }
+  }
+  # ------------------------------------------------------------------------------------------
 
+  # ------------------------------------------------------------------------------------------
+  # Reversed order when network_desc_order is true
+  # If network_desc_order is true, bridge network interface is first
+  # If network_desc_order is false, local network interface is first
+  dynamic "network_interface" {
+    for_each = var.network_desc_order && var.bridge_network_configuration.is_enabled ? [1] : []
+    content {
+      network_name = local.bridge_network_name
+      bridge = "br0"
     }
   }
 
+  dynamic "network_interface" {
+    for_each = var.network_desc_order && var.local_network_configuration.is_enabled ? [1] : []
+    content {
+      network_name = local.local_network_name
+    }
+  }
+  # ------------------------------------------------------------------------------------------
 
   # see: https://github.com/dmacvicar/terraform-provider-libvirt/blob/main/examples/v0.13/ubuntu/ubuntu-example.tf
   # why we have double console (it is some bug in cloud init)
