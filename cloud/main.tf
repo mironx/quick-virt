@@ -46,14 +46,55 @@ variable "local_network_configuration" {
     mask = string
     gateway4 = string
     nameservers = list(string)
+    dhcp_mode = string # enum: "dhcp", "ips_static_other_dhcp", "static"
   })
   default = {
-    is_enabled = false
+    is_enabled = true
     name = "local-network"
     ip = "192.168.100.15"
     mask = "24"
-    gateway4 = "192.168.100.1"
-    nameservers = ["1.1.1.1", "8.8.8.8"]
+    gateway4 = ""
+    nameservers = []
+    # gateway4 = "192.168.100.1"
+    # nameservers = ["1.1.1.1", "8.8.8.8"]
+    dhcp_mode = "ips_static_other_dhcp"
+  }
+  validation {
+    condition = contains(["dhcp", "ips_static_other_dhcp", "static"], var.local_network_configuration.dhcp_mode)
+    error_message = "Allowed values for dhcp_mode: dhcp, ips_static_other_dhcp, static"
+  }
+
+  # Validation for dhcp mode - ip, mask, gateway4, nameservers should be empty
+  validation {
+    condition = var.local_network_configuration.dhcp_mode != "dhcp" || (
+      var.local_network_configuration.ip == "" &&
+      var.local_network_configuration.mask == "" &&
+      var.local_network_configuration.gateway4 == "" &&
+      length(var.local_network_configuration.nameservers) == 0
+    )
+    error_message = "When dhcp_mode is set to 'dhcp', the fields ip, mask, gateway4, and nameservers must be empty"
+  }
+
+  # Validation for ips_static_other_dhcp mode - ip and mask must be set, gateway4 and nameservers should be empty
+  validation {
+    condition = var.local_network_configuration.dhcp_mode != "ips_static_other_dhcp" || (
+      var.local_network_configuration.ip != "" &&
+      var.local_network_configuration.mask != "" &&
+      var.local_network_configuration.gateway4 == "" &&
+      length(var.local_network_configuration.nameservers) == 0
+    )
+    error_message = "When dhcp_mode is set to 'ips_static_other_dhcp', the fields ip and mask must be set, while gateway4 and nameservers must be empty"
+  }
+
+  # Validation for static mode - all fields must be set
+  validation {
+    condition = var.local_network_configuration.dhcp_mode != "static" || (
+      var.local_network_configuration.ip != "" &&
+      var.local_network_configuration.mask != "" &&
+      var.local_network_configuration.gateway4 != "" &&
+      length(var.local_network_configuration.nameservers) > 0
+    )
+    error_message = "When dhcp_mode is set to 'static', the fields ip, mask, gateway4, and nameservers must be set"
   }
 }
 
@@ -66,20 +107,65 @@ variable "bridge_network_configuration" {
     mask = string
     gateway4 = string
     nameservers = list(string)
+    dhcp_mode = string # enum: "dhcp", "ips_static_other_dhcp", "static"
   })
   default = {
     is_enabled = true
     name = "bridge-network"
     ip = "172.16.0.15"
     mask = "12"
-    gateway4 = "172.16.0.1"
-    nameservers = ["172.16.0.1"]
+    gateway4 = ""
+    nameservers = []
+    # gateway4 = "172.16.0.1"
+    # nameservers = ["172.16.0.1"]
+    dhcp_mode = "ips_static_other_dhcp"
+  }
+  validation {
+    condition = contains(["dhcp", "ips_static_other_dhcp", "static"], var.bridge_network_configuration.dhcp_mode)
+    error_message = "Allowed values for dhcp_mode: dhcp, ips_static_other_dhcp, static"
+  }
+
+  # Validation for dhcp mode - ip, mask, gateway4, nameservers should be empty
+  validation {
+    condition = var.bridge_network_configuration.dhcp_mode != "dhcp" || (
+      var.bridge_network_configuration.ip == "" &&
+      var.bridge_network_configuration.mask == "" &&
+      var.bridge_network_configuration.gateway4 == "" &&
+      length(var.bridge_network_configuration.nameservers) == 0
+    )
+    error_message = "When dhcp_mode is set to 'dhcp', the fields ip, mask, gateway4, and nameservers must be empty"
+  }
+
+  # Validation for ips_static_other_dhcp mode - ip and mask must be set, gateway4 and nameservers should be empty
+  validation {
+    condition = var.bridge_network_configuration.dhcp_mode != "ips_static_other_dhcp" || (
+      var.bridge_network_configuration.ip != "" &&
+      var.bridge_network_configuration.mask != "" &&
+      var.bridge_network_configuration.gateway4 == "" &&
+      length(var.bridge_network_configuration.nameservers) == 0
+    )
+    error_message = "When dhcp_mode is set to 'ips_static_other_dhcp', the fields ip and mask must be set, while gateway4 and nameservers must be empty"
+  }
+
+  # Validation for static mode - all fields must be set
+  validation {
+    condition = var.bridge_network_configuration.dhcp_mode != "static" || (
+      var.bridge_network_configuration.ip != "" &&
+      var.bridge_network_configuration.mask != "" &&
+      var.bridge_network_configuration.gateway4 != "" &&
+      length(var.bridge_network_configuration.nameservers) > 0
+    )
+    error_message = "When dhcp_mode is set to 'static', the fields ip, mask, gateway4, and nameservers must be set"
   }
 }
 
 
 //-------------------------------------------------------------------------------
 locals {
+  local_dhcp = var.local_network_configuration.is_enabled && var.local_network_configuration.dhcp_mode == "dhcp"
+  local_part_dhcp = var.local_network_configuration.is_enabled && var.local_network_configuration.dhcp_mode == "ips_static_other_dhcp"
+  bridge_dhcp = var.bridge_network_configuration.is_enabled && var.bridge_network_configuration.dhcp_mode == "dhcp"
+  bridge_part_dhcp = var.bridge_network_configuration.is_enabled && var.bridge_network_configuration.dhcp_mode == "ips_static_other_dhcp"
 
   interface_network1 = "ens3"
   interface_network2 = var.local_network_configuration.is_enabled ? "ens4" : "ens3"
@@ -92,6 +178,8 @@ locals {
     local_network_mask = var.local_network_configuration.mask,
     local_network_gateway4 = var.local_network_configuration.gateway4,
     local_network_nameservers = var.local_network_configuration.nameservers
+    local_dhcp = local.local_dhcp
+    local_part_dhcp = local.local_part_dhcp
 
     interface_network2 = local.interface_network2
     bridge_is_enabled = var.bridge_network_configuration.is_enabled,
@@ -99,6 +187,8 @@ locals {
     bridge_network_mask = var.bridge_network_configuration.mask,
     bridge_network_gateway4 = var.bridge_network_configuration.gateway4,
     bridge_network_nameservers = var.bridge_network_configuration.nameservers
+    bridge_dhcp = local.bridge_dhcp
+    bridge_part_dhcp = local.bridge_part_dhcp
   })
 
   user_data = templatefile("${path.module}/templates/user-data.tmpl", {

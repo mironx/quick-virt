@@ -4,6 +4,17 @@ ethernets:
 %{ endif }
 %{ if local_is_enabled }
   ${interface_network1}:
+  %{ if local_dhcp }
+    dhcp4: true
+  %{ else }
+    %{ if local_part_dhcp }
+    addresses:
+      - ${local_network_ip}/${local_network_mask}
+    dhcp4: true
+    dhcp4-overrides:
+      use-dns: false
+      use-routes: false
+    %{ else }
     addresses:
       - ${local_network_ip}/${local_network_mask}
     routes:
@@ -14,9 +25,22 @@ ethernets:
 %{ for ns in local_network_nameservers ~}
         - ${ns}
 %{ endfor ~}
+    %{ endif }
+  %{ endif }
 %{ endif }
 %{ if bridge_is_enabled }
   ${interface_network2}:
+  %{ if bridge_dhcp }
+    dhcp4: true
+  %{ else }
+    %{ if bridge_part_dhcp }
+    addresses:
+      - ${bridge_network_ip}/${bridge_network_mask}
+    dhcp4: true
+    dhcp4-overrides:
+      use-dns: false
+      use-routes: false
+    %{ else }
     addresses:
       - ${bridge_network_ip}/${bridge_network_mask}
     routes:
@@ -27,4 +51,6 @@ ethernets:
 %{ for ns in bridge_network_nameservers ~}
         - ${ns}
 %{ endfor ~}
+    %{ endif }
+  %{ endif }
 %{ endif }
