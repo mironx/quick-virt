@@ -10,324 +10,92 @@ provider "libvirt" {
   uri = "qemu:///system"
 }
 
-variable "vm" {
-  type = object({
-    name         = string
-    image_source = string
-    vcpu         = number
-    memory       = number
-    user_name    = string
-    network_desc_order = bool
-  })
-
-  default = {
-    name         = "vm_test_1"
+module "vm1" {
+  source = "../modules/vm_ubuntu_24"
+  vm = {
+    name = "vm_test_1"
     image_source = "/var/lib/libvirt/images/ubuntu-2204.qcow2.base"
     vcpu         = 2
     memory       = 2048
     user_name    = "devx"
     network_desc_order = false
   }
-
-  validation {
-    condition     = var.vm.name != null && var.vm.name != ""
-    error_message = "Variable vm.name must be defined."
+  local_network_configuration = {
+    is_enabled = true
+    ip         = "192.168.100.15"
+    mask       = "24"
+    gateway4   = ""
+    nameservers = []
+    dhcp_mode  = "ips_static_other_dhcp"
   }
-
-  validation {
-    condition     = var.vm.image_source != null && var.vm.image_source != ""
-    error_message = "Variable vm.image_source must be defined."
+  bridge_network_configuration = {
+    is_enabled = false
+    ip         = "172.16.0.15"
+    mask       = "12"
+    gateway4   = ""
+    nameservers = []
+    dhcp_mode  = "ips_static_other_dhcp"
   }
 }
 
-# variable "vm_name" {
-#   type = string
-#   default = "vm_test_1"
-# }
-#
-# variable "vm_image_source"{
-#   type = string
-#   default = "/var/lib/libvirt/images/ubuntu-2204.qcow2.base"
-# }
-#
-# variable "vm_vcpu" {
-#   type = number
-#   default = 2
-# }
-#
-# variable "vm_memory" {
-#   type = number
-#   default = 2048
-# }
-#
-# variable "user_name" {
-#   type = string
-#   default = "devx"
-# }
-#
-# variable "network_desc_order" {
-#   type    = bool
-#   default = false
-# }
-
-
-// local_network_name = "local-network"
-// local_network_addresses = ["192.168.100.0/24"]
-variable "local_network_configuration" {
-  type = object({
-    is_enabled = bool
-    ip = string
-    mask = string
-    gateway4 = string
-    nameservers = list(string)
-    dhcp_mode = string # enum: "dhcp", "ips_static_other_dhcp", "static"
-  })
-  default = {
+module "vm2" {
+  source = "../modules/vm_ubuntu_24"
+  vm = {
+    name = "vm_test_2"
+    image_source = "/var/lib/libvirt/images/ubuntu-2204.qcow2.base"
+    vcpu         = 2
+    memory       = 2048
+    user_name    = "devx"
+    network_desc_order = false
+  }
+  local_network_configuration = {
     is_enabled = true
-    ip = "192.168.100.15"
-    mask = "24"
+    ip         = "192.168.100.16"
+    mask       = "24"
+    gateway4 = "192.168.100.1"
+    nameservers = ["192.168.100.1"]
+    # gateway4   = ""
+    # nameservers = []
+    dhcp_mode  = "static"
+  }
+  bridge_network_configuration = {
+    is_enabled = false
+    ip         = "172.16.0.16"
+    mask       = "12"
+    gateway4 = "172.16.0.1"
+    nameservers = ["172.16.0.1"]
+    # gateway4   = ""
+    # nameservers = []
+    dhcp_mode  = "static"
+  }
+}
+
+module "vm3" {
+  source = "../modules/vm_ubuntu_24"
+  vm = {
+    name = "vm_test_3"
+    image_source = "/var/lib/libvirt/images/ubuntu-2204.qcow2.base"
+    vcpu         = 2
+    memory       = 2048
+    user_name    = "devx"
+    network_desc_order = false
+  }
+  local_network_configuration = {
+    is_enabled = true
+    ip         = ""
+    mask       = ""
     gateway4 = ""
     nameservers = []
-    # gateway4 = "192.168.100.1"
-    # nameservers = ["1.1.1.1", "8.8.8.8"]
-    dhcp_mode = "ips_static_other_dhcp"
+    # gateway4   = ""
+    # nameservers = []
+    dhcp_mode  = "dhcp"
   }
-  validation {
-    condition = contains(["dhcp", "ips_static_other_dhcp", "static"], var.local_network_configuration.dhcp_mode)
-    error_message = "Allowed values for dhcp_mode: dhcp, ips_static_other_dhcp, static"
-  }
-
-  # Validation for dhcp mode - ip, mask, gateway4, nameservers should be empty
-  validation {
-    condition = var.local_network_configuration.dhcp_mode != "dhcp" || (
-      var.local_network_configuration.ip == "" &&
-      var.local_network_configuration.mask == "" &&
-      var.local_network_configuration.gateway4 == "" &&
-      length(var.local_network_configuration.nameservers) == 0
-    )
-    error_message = "When dhcp_mode is set to 'dhcp', the fields ip, mask, gateway4, and nameservers must be empty"
-  }
-
-  # Validation for ips_static_other_dhcp mode - ip and mask must be set, gateway4 and nameservers should be empty
-  validation {
-    condition = var.local_network_configuration.dhcp_mode != "ips_static_other_dhcp" || (
-      var.local_network_configuration.ip != "" &&
-      var.local_network_configuration.mask != "" &&
-      var.local_network_configuration.gateway4 == "" &&
-      length(var.local_network_configuration.nameservers) == 0
-    )
-    error_message = "When dhcp_mode is set to 'ips_static_other_dhcp', the fields ip and mask must be set, while gateway4 and nameservers must be empty"
-  }
-
-  # Validation for static mode - all fields must be set
-  validation {
-    condition = var.local_network_configuration.dhcp_mode != "static" || (
-      var.local_network_configuration.ip != "" &&
-      var.local_network_configuration.mask != "" &&
-      var.local_network_configuration.gateway4 != "" &&
-      length(var.local_network_configuration.nameservers) > 0
-    )
-    error_message = "When dhcp_mode is set to 'static', the fields ip, mask, gateway4, and nameservers must be set"
-  }
-}
-
-// Bridge network configuration
-variable "bridge_network_configuration" {
-  type = object({
-    is_enabled = bool
-    ip = string
-    mask = string
-    gateway4 = string
-    nameservers = list(string)
-    dhcp_mode = string # enum: "dhcp", "ips_static_other_dhcp", "static"
-  })
-  default = {
-    is_enabled = true
-    ip = "172.16.0.15"
-    mask = "12"
-    gateway4 = ""
+  bridge_network_configuration = {
+    is_enabled = false
+    ip         = ""
+    mask       = ""
+    gateway4   = ""
     nameservers = []
-    # gateway4 = "172.16.0.1"
-    # nameservers = ["172.16.0.1"]
-    dhcp_mode = "ips_static_other_dhcp"
+    dhcp_mode  = "dhcp"
   }
-  validation {
-    condition = contains(["dhcp", "ips_static_other_dhcp", "static"], var.bridge_network_configuration.dhcp_mode)
-    error_message = "Allowed values for dhcp_mode: dhcp, ips_static_other_dhcp, static"
-  }
-
-  # Validation for dhcp mode - ip, mask, gateway4, nameservers should be empty
-  validation {
-    condition = var.bridge_network_configuration.dhcp_mode != "dhcp" || (
-      var.bridge_network_configuration.ip == "" &&
-      var.bridge_network_configuration.mask == "" &&
-      var.bridge_network_configuration.gateway4 == "" &&
-      length(var.bridge_network_configuration.nameservers) == 0
-    )
-    error_message = "When dhcp_mode is set to 'dhcp', the fields ip, mask, gateway4, and nameservers must be empty"
-  }
-
-  # Validation for ips_static_other_dhcp mode - ip and mask must be set, gateway4 and nameservers should be empty
-  validation {
-    condition = var.bridge_network_configuration.dhcp_mode != "ips_static_other_dhcp" || (
-      var.bridge_network_configuration.ip != "" &&
-      var.bridge_network_configuration.mask != "" &&
-      var.bridge_network_configuration.gateway4 == "" &&
-      length(var.bridge_network_configuration.nameservers) == 0
-    )
-    error_message = "When dhcp_mode is set to 'ips_static_other_dhcp', the fields ip and mask must be set, while gateway4 and nameservers must be empty"
-  }
-
-  # Validation for static mode - all fields must be set
-  validation {
-    condition = var.bridge_network_configuration.dhcp_mode != "static" || (
-      var.bridge_network_configuration.ip != "" &&
-      var.bridge_network_configuration.mask != "" &&
-      var.bridge_network_configuration.gateway4 != "" &&
-      length(var.bridge_network_configuration.nameservers) > 0
-    )
-    error_message = "When dhcp_mode is set to 'static', the fields ip, mask, gateway4, and nameservers must be set"
-  }
-}
-
-
-//-------------------------------------------------------------------------------
-locals {
-  local_network_name = "local-network"
-  bridge_network_name = "bridge-network"
-  local_dhcp = var.local_network_configuration.is_enabled && var.local_network_configuration.dhcp_mode == "dhcp"
-  local_part_dhcp = var.local_network_configuration.is_enabled && var.local_network_configuration.dhcp_mode == "ips_static_other_dhcp"
-  bridge_dhcp = var.bridge_network_configuration.is_enabled && var.bridge_network_configuration.dhcp_mode == "dhcp"
-  bridge_part_dhcp = var.bridge_network_configuration.is_enabled && var.bridge_network_configuration.dhcp_mode == "ips_static_other_dhcp"
-
-  interface_network1 = "ens3"
-  interface_network2 = var.local_network_configuration.is_enabled ? "ens4" : "ens3"
-  user_password = trimspace(file("${path.module}/pswd"))
-
-  network_config = templatefile("${path.module}/templates/network-config.tmpl", {
-    interface_network1 = local.interface_network1
-    local_is_enabled = var.local_network_configuration.is_enabled,
-    local_network_ip = var.local_network_configuration.ip,
-    local_network_mask = var.local_network_configuration.mask,
-    local_network_gateway4 = var.local_network_configuration.gateway4,
-    local_network_nameservers = var.local_network_configuration.nameservers
-    local_dhcp = local.local_dhcp
-    local_part_dhcp = local.local_part_dhcp
-
-    interface_network2 = local.interface_network2
-    bridge_is_enabled = var.bridge_network_configuration.is_enabled,
-    bridge_network_ip = var.bridge_network_configuration.ip,
-    bridge_network_mask = var.bridge_network_configuration.mask,
-    bridge_network_gateway4 = var.bridge_network_configuration.gateway4,
-    bridge_network_nameservers = var.bridge_network_configuration.nameservers
-    bridge_dhcp = local.bridge_dhcp
-    bridge_part_dhcp = local.bridge_part_dhcp
-  })
-
-  user_data = templatefile("${path.module}/templates/user-data.tmpl", {
-    local_hostname  = var.vm.name
-    user_name = var.vm.user_name
-    user_password = local.user_password
-  })
-
-  meta_data = templatefile("${path.module}/templates/user-data.tmpl", {
-    local_hostname  = var.vm.name
-    user_name = var.vm.user_name
-    user_password = local.user_password
-  })
-}
-
-//-------------------------------------------------------------------------------
-
-resource "libvirt_volume" "vm-disk" {
-  name   = "${var.vm.name}.qcow2"
-  pool   = "default"
-  source = var.vm.image_source
-  format = "qcow2"
-}
-
-resource "libvirt_cloudinit_disk" "cloudinit" {
-  name           = "${var.vm.name}_cloudinit.iso"
-  network_config = local.network_config
-  user_data      = local.user_data
-  meta_data      = local.meta_data
-  pool           = "default"
-}
-
-resource "libvirt_domain" "vm" {
-  name   = var.vm.name
-  memory = var.vm.memory
-  vcpu   = var.vm.vcpu
-
-  disk {    
-    volume_id = libvirt_volume.vm-disk.id
-  }
-
-  cloudinit = libvirt_cloudinit_disk.cloudinit.id
-
-  # ------------------------------------------------------------------------------------------
-  # Network interfaces are ordered differently based on network_desc_order variable
-  # If network_desc_order is false, local network interface is first
-  # If network_desc_order is true, bridge network interface is first
-  dynamic "network_interface" {
-    for_each = !var.vm.network_desc_order && var.local_network_configuration.is_enabled ? [1] : []
-    content {
-      network_name = local.local_network_name
-    }
-  }
-
-  dynamic "network_interface" {
-    for_each = !var.vm.network_desc_order && var.bridge_network_configuration.is_enabled ? [1] : []
-    content {
-      network_name = local.bridge_network_name
-      bridge = "br0"
-    }
-  }
-  # ------------------------------------------------------------------------------------------
-
-  # ------------------------------------------------------------------------------------------
-  # Reversed order when network_desc_order is true
-  # If network_desc_order is true, bridge network interface is first
-  # If network_desc_order is false, local network interface is first
-  dynamic "network_interface" {
-    for_each = var.vm.network_desc_order && var.bridge_network_configuration.is_enabled ? [1] : []
-    content {
-      network_name = local.bridge_network_name
-      bridge = "br0"
-    }
-  }
-
-  dynamic "network_interface" {
-    for_each = var.vm.network_desc_order && var.local_network_configuration.is_enabled ? [1] : []
-    content {
-      network_name = local.local_network_name
-    }
-  }
-  # ------------------------------------------------------------------------------------------
-
-  # see: https://github.com/dmacvicar/terraform-provider-libvirt/blob/main/examples/v0.13/ubuntu/ubuntu-example.tf
-  # why we have double console (it is some bug in cloud init)
-
-  console {
-    type        = "pty"
-    target_port = "0"
-    target_type = "serial"
-  }
-
-  console {
-    type        = "pty"
-    target_type = "virtio"
-    target_port = "1"
-  }
-
-  graphics {
-    type        = "spice"
-    listen_type = "address"
-    autoport    = true
-  }
-
-  depends_on = [    
-    libvirt_volume.vm-disk,
-    libvirt_cloudinit_disk.cloudinit,
-  ]
 }
