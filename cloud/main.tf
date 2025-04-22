@@ -41,7 +41,6 @@ variable "user_name" {
 variable "local_network_configuration" {
   type = object({
     is_enabled = bool
-    name = string
     ip = string
     mask = string
     gateway4 = string
@@ -50,7 +49,6 @@ variable "local_network_configuration" {
   })
   default = {
     is_enabled = true
-    name = "local-network"
     ip = "192.168.100.15"
     mask = "24"
     gateway4 = ""
@@ -102,7 +100,6 @@ variable "local_network_configuration" {
 variable "bridge_network_configuration" {
   type = object({
     is_enabled = bool
-    name = string
     ip = string
     mask = string
     gateway4 = string
@@ -111,7 +108,6 @@ variable "bridge_network_configuration" {
   })
   default = {
     is_enabled = true
-    name = "bridge-network"
     ip = "172.16.0.15"
     mask = "12"
     gateway4 = ""
@@ -162,6 +158,8 @@ variable "bridge_network_configuration" {
 
 //-------------------------------------------------------------------------------
 locals {
+  local_network_name = "local-network"
+  bridge_network_name = "bridge-network"
   local_dhcp = var.local_network_configuration.is_enabled && var.local_network_configuration.dhcp_mode == "dhcp"
   local_part_dhcp = var.local_network_configuration.is_enabled && var.local_network_configuration.dhcp_mode == "ips_static_other_dhcp"
   bridge_dhcp = var.bridge_network_configuration.is_enabled && var.bridge_network_configuration.dhcp_mode == "dhcp"
@@ -235,14 +233,14 @@ resource "libvirt_domain" "vm" {
   dynamic "network_interface" {
     for_each = var.local_network_configuration.is_enabled ? [1] : []
     content {
-      network_name = var.local_network_configuration.name
+      network_name = local.local_network_name
     }
   }
 
   dynamic "network_interface" {
     for_each = var.bridge_network_configuration.is_enabled ? [1] : []
     content {
-      network_name = var.bridge_network_configuration.name
+      network_name = local.bridge_network_name
       bridge = "br0"
 
     }
