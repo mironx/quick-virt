@@ -10,35 +10,65 @@ provider "libvirt" {
   uri = "qemu:///system"
 }
 
-variable "vm_name" {
-  type = string
-  default = "vm_test_1"
+variable "vm" {
+  type = object({
+    name         = string
+    image_source = string
+    vcpu         = number
+    memory       = number
+    user_name    = string
+    network_desc_order = bool
+  })
+
+  default = {
+    name         = "vm_test_1"
+    image_source = "/var/lib/libvirt/images/ubuntu-2204.qcow2.base"
+    vcpu         = 2
+    memory       = 2048
+    user_name    = "devx"
+    network_desc_order = false
+  }
+
+  validation {
+    condition     = var.vm.name != null && var.vm.name != ""
+    error_message = "Variable vm.name must be defined."
+  }
+
+  validation {
+    condition     = var.vm.image_source != null && var.vm.image_source != ""
+    error_message = "Variable vm.image_source must be defined."
+  }
 }
 
-variable "vm_image_source"{
-  type = string
-  default = "/var/lib/libvirt/images/ubuntu-2204.qcow2.base"
-}
-
-variable "vm_vcpu" {
-  type = number
-  default = 2
-}
-
-variable "vm_memory" {
-  type = number
-  default = 2048
-}
-
-variable "user_name" {
-  type = string
-  default = "devx"
-}
-
-variable "network_desc_order" {
-  type    = bool
-  default = false
-}
+# variable "vm_name" {
+#   type = string
+#   default = "vm_test_1"
+# }
+#
+# variable "vm_image_source"{
+#   type = string
+#   default = "/var/lib/libvirt/images/ubuntu-2204.qcow2.base"
+# }
+#
+# variable "vm_vcpu" {
+#   type = number
+#   default = 2
+# }
+#
+# variable "vm_memory" {
+#   type = number
+#   default = 2048
+# }
+#
+# variable "user_name" {
+#   type = string
+#   default = "devx"
+# }
+#
+# variable "network_desc_order" {
+#   type    = bool
+#   default = false
+# }
 
 
 // local_network_name = "local-network"
@@ -195,14 +225,14 @@ locals {
   })
 
   user_data = templatefile("${path.module}/templates/user-data.tmpl", {
-    local_hostname  = var.vm_name
-    user_name = var.user_name
+    local_hostname  = var.vm.name
+    user_name = var.vm.user_name
     user_password = local.user_password
   })
 
   meta_data = templatefile("${path.module}/templates/user-data.tmpl", {
-    local_hostname  = var.vm_name
-    user_name = var.user_name
+    local_hostname  = var.vm.name
+    user_name = var.vm.user_name
     user_password = local.user_password
   })
 }
@@ -210,14 +240,14 @@ locals {
 //-------------------------------------------------------------------------------
 
 resource "libvirt_volume" "vm-disk" {
-  name   = "${var.vm_name}.qcow2"
+  name   = "${var.vm.name}.qcow2"
   pool   = "default"
-  source = var.vm_image_source
+  source = var.vm.image_source
   format = "qcow2"
 }
 
 resource "libvirt_cloudinit_disk" "cloudinit" {
-  name           = "${var.vm_name}_cloudinit.iso"
+  name           = "${var.vm.name}_cloudinit.iso"
   network_config = local.network_config
   user_data      = local.user_data
   meta_data      = local.meta_data
@@ -225,9 +255,9 @@ resource "libvirt_cloudinit_disk" "cloudinit" {
 }
 
 resource "libvirt_domain" "vm" {
-  name   = var.vm_name
-  memory = var.vm_memory
-  vcpu   = var.vm_vcpu
+  name   = var.vm.name
+  memory = var.vm.memory
+  vcpu   = var.vm.vcpu
 
   disk {    
     volume_id = libvirt_volume.vm-disk.id
@@ -240,14 +270,14 @@ resource "libvirt_domain" "vm" {
   # If network_desc_order is false, local network interface is first
   # If network_desc_order is true, bridge network interface is first
   dynamic "network_interface" {
-    for_each = !var.network_desc_order && var.local_network_configuration.is_enabled ? [1] : []
+    for_each = !var.vm.network_desc_order && var.local_network_configuration.is_enabled ? [1] : []
     content {
       network_name = local.local_network_name
     }
   }
 
   dynamic "network_interface" {
-    for_each = !var.network_desc_order && var.bridge_network_configuration.is_enabled ? [1] : []
+    for_each = !var.vm.network_desc_order && var.bridge_network_configuration.is_enabled ? [1] : []
     content {
       network_name = local.bridge_network_name
       bridge = "br0"
@@ -260,7 +290,7 @@ resource "libvirt_domain" "vm" {
   # If network_desc_order is true, bridge network interface is first
   # If network_desc_order is false, local network interface is first
   dynamic "network_interface" {
-    for_each = var.network_desc_order && var.bridge_network_configuration.is_enabled ? [1] : []
+    for_each = var.vm.network_desc_order && var.bridge_network_configuration.is_enabled ? [1] : []
     content {
       network_name = local.bridge_network_name
       bridge = "br0"
@@ -268,7 +298,7 @@ resource "libvirt_domain" "vm" {
   }
 
   dynamic "network_interface" {
-    for_each = var.network_desc_order && var.local_network_configuration.is_enabled ? [1] : []
+    for_each = var.vm.network_desc_order && var.local_network_configuration.is_enabled ? [1] : []
     content {
       network_name = local.local_network_name
     }
