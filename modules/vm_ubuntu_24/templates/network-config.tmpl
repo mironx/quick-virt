@@ -1,0 +1,38 @@
+version: 2
+%{ if local_is_enabled || bridge_is_enabled  }
+ethernets:
+%{ endif }
+%{ if local_is_enabled }
+  ${interface_network1}:
+  %{ if local_dhcp }
+    dhcp4: true
+  %{ else }
+    addresses:
+      - ${local_network_ip}/${local_network_mask}
+    routes:
+      - to: default
+        via: ${local_network_gateway4}
+    nameservers:
+      addresses:
+%{ for ns in local_network_nameservers ~}
+        - ${ns}
+%{ endfor ~}
+  %{ endif }
+%{ endif }
+%{ if bridge_is_enabled }
+  ${interface_network2}:
+  %{ if bridge_dhcp }
+    dhcp4: true
+  %{ else }
+    addresses:
+      - ${bridge_network_ip}/${bridge_network_mask}
+    routes:
+      - to: default
+        via: ${bridge_network_gateway4}
+    nameservers:
+      addresses:
+%{ for ns in bridge_network_nameservers ~}
+        - ${ns}
+%{ endfor ~}
+  %{ endif }
+%{ endif }
