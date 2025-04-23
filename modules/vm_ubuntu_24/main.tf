@@ -18,37 +18,83 @@ locals {
     user_name = coalesce(var.vm_profile.user_name, null)
     network_desc_order = coalesce(var.vm_profile.network_desc_order, false)
   }
+  current_local_network = {
+    ip = try(coalesce(var.local_network.ip,""),"")
+    is_enabled = coalesce(var.local_network.is_enabled, true)
+    profile = coalesce(var.local_network.is_enabled, true) ? {
+      dhcp_mode   = coalesce(var.local_network.profile.dhcp_mode, "dhcp")
+      mask        = try(coalesce(var.local_network.profile.mask, null),"")
+      gateway4    = try(coalesce(var.local_network.profile.gateway4, null),"")
+      nameservers = coalesce(var.local_network.profile.nameservers, [])
+    } : {
+      dhcp_mode   = "?"
+      mask        = "?"
+      gateway4    = "?"
+      nameservers = ["?"]
+    }
+  }
+
+  current_bridge_network = {
+    ip = try(coalesce(var.bridge_network.ip,""),"?")
+    is_enabled = coalesce(var.bridge_network.is_enabled, true)
+    profile = coalesce(var.bridge_network.is_enabled, true) ? {
+      dhcp_mode = coalesce(var.bridge_network.profile.dhcp_mode, "dhcp")
+      mask = try(coalesce(var.bridge_network.profile.mask, null),"")
+      gateway4 = try(coalesce(var.bridge_network.profile.gateway4, null),"")
+      nameservers = coalesce(var.bridge_network.profile.nameservers, [])
+      bridge = coalesce(var.bridge_network.profile.bridge, "")
+    } : {
+      dhcp_mode   = "?"
+      mask        = "?"
+      gateway4    = "?"
+      nameservers = ["?"]
+      bridge      = "?"
+    }
+  }
 }
+
+# resource "null_resource" "debug_local_network" {
+#   triggers = {
+#     always_run = timestamp()
+#   }
+#   lifecycle {
+#     precondition {
+#       condition = local.current_local_network == null
+#       error_message = jsonencode(local.current_local_network)
+#     }
+#   }
+# }
+
 
 
 //-------------------------------------------------------------------------------
 locals {
   local_network_name = "local-network"
   bridge_network_name = "bridge-network"
-  local_dhcp = var.local_network_configuration.is_enabled && var.local_network_configuration.dhcp_mode == "dhcp"
-  bridge_dhcp = var.bridge_network_configuration.is_enabled && var.bridge_network_configuration.dhcp_mode == "dhcp"
+  local_dhcp = local.current_local_network.is_enabled && local.current_local_network.profile.dhcp_mode == "dhcp"
+  bridge_dhcp = local.current_bridge_network.is_enabled && local.current_bridge_network.profile.dhcp_mode == "dhcp"
 
 
   interface_network1 = "ens3"
-  interface_network2 = var.local_network_configuration.is_enabled ? "ens4" : "ens3"
+  interface_network2 = local.current_local_network.is_enabled ? "ens4" : "ens3"
   user_password = trimspace(file("${path.module}/pswd"))
 
   network_config = templatefile("${path.module}/templates/network-config.tmpl", {
     interface_network1 = local.interface_network1
-    local_is_enabled = var.local_network_configuration.is_enabled,
-    local_network_ip = var.local_network_configuration.ip,
-    local_network_mask = var.local_network_configuration.mask,
-    local_network_gateway4 = var.local_network_configuration.gateway4,
-    local_network_nameservers = var.local_network_configuration.nameservers
+    local_is_enabled = local.current_local_network.is_enabled,
+    local_network_ip = local.current_local_network.ip,
+    local_network_mask = local.current_local_network.profile.mask,
+    local_network_gateway4 = local.current_local_network.profile.gateway4,
+    local_network_nameservers = local.current_local_network.profile.nameservers
     local_dhcp = local.local_dhcp
 
 
     interface_network2 = local.interface_network2
-    bridge_is_enabled = var.bridge_network_configuration.is_enabled,
-    bridge_network_ip = var.bridge_network_configuration.ip,
-    bridge_network_mask = var.bridge_network_configuration.mask,
-    bridge_network_gateway4 = var.bridge_network_configuration.gateway4,
-    bridge_network_nameservers = var.bridge_network_configuration.nameservers
+    bridge_is_enabled = local.current_bridge_network.is_enabled,
+    bridge_network_ip = local.current_bridge_network.ip,
+    bridge_network_mask = local.current_bridge_network.profile.mask,
+    bridge_network_gateway4 = local.current_bridge_network.profile.gateway4,
+    bridge_network_nameservers = local.current_bridge_network.profile.nameservers
     bridge_dhcp = local.bridge_dhcp
   })
 
@@ -100,17 +146,17 @@ resource "libvirt_domain" "vm" {
   # If network_desc_order is false, local network interface is first
   # If network_desc_order is true, bridge network interface is first
   dynamic "network_interface" {
-    for_each = !local.current_vm_profile.network_desc_order && var.local_network_configuration.is_enabled ? [1] : []
+    for_each = !local.current_vm_profile.network_desc_order && local.current_local_network.is_enabled ? [1] : []
     content {
       network_name = local.local_network_name
     }
   }
 
   dynamic "network_interface" {
-    for_each = !local.current_vm_profile.network_desc_order && var.bridge_network_configuration.is_enabled ? [1] : []
+    for_each = !local.current_vm_profile.network_desc_order && local.current_bridge_network.is_enabled ? [1] : []
     content {
       network_name = local.bridge_network_name
-      bridge = "br0"
+      bridge = local.current_bridge_network.profile.bridge
     }
   }
   # ------------------------------------------------------------------------------------------
@@ -120,15 +166,15 @@ resource "libvirt_domain" "vm" {
   # If network_desc_order is true, bridge network interface is first
   # If network_desc_order is false, local network interface is first
   dynamic "network_interface" {
-    for_each = local.current_vm_profile.network_desc_order && var.bridge_network_configuration.is_enabled ? [1] : []
+    for_each = local.current_vm_profile.network_desc_order && local.current_bridge_network.is_enabled ? [1] : []
     content {
       network_name = local.bridge_network_name
-      bridge = "br0"
+      bridge = local.current_bridge_network.profile.bridge
     }
   }
 
   dynamic "network_interface" {
-    for_each = local.current_vm_profile.network_desc_order && var.local_network_configuration.is_enabled ? [1] : []
+    for_each = local.current_vm_profile.network_desc_order && local.current_local_network.is_enabled ? [1] : []
     content {
       network_name = local.local_network_name
     }

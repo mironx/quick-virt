@@ -16,6 +16,26 @@ locals {
     memory = 2048
     user_name = "devx"
   }
+  local_network_profile_static = {
+    mask       = "24"
+    gateway4 = "192.168.100.1"
+    nameservers = ["192.168.100.1"]
+    dhcp_mode  = "static"
+  }
+  bridge_network_profile_static = {
+    mask       = "12"
+    gateway4 = "172.16.0.1"
+    nameservers = ["172.16.0.1"]
+    dhcp_mode  = "static"
+    bridge = "br0"
+  }
+  local_network_profile_dhcp = {
+    dhcp_mode  = "dhcp"
+  }
+  bridge_network_profile_dhcp = {
+    dhcp_mode  = "dhcp"
+    bridge = "br0"
+  }
 }
 
 
@@ -23,25 +43,13 @@ module "vm1" {
   source = "../modules/vm_ubuntu_24"
   name = "vt1_static_lcoal_network"
   vm_profile = local.vm_profile
-  local_network_configuration = {
-    is_enabled = true
+  local_network = {
     ip         = "192.168.100.16"
-    mask       = "24"
-    gateway4 = "192.168.100.1"
-    nameservers = ["192.168.100.1"]
-    # gateway4   = ""
-    # nameservers = []
-    dhcp_mode  = "static"
+    profile = local.local_network_profile_static
   }
-  bridge_network_configuration = {
-    is_enabled = false
+  bridge_network = {
     ip         = "172.16.0.16"
-    mask       = "12"
-    gateway4 = "172.16.0.1"
-    nameservers = ["172.16.0.1"]
-    # gateway4   = ""
-    # nameservers = []
-    dhcp_mode  = "static"
+    profile = local.bridge_network_profile_static
   }
 }
 
@@ -49,22 +57,52 @@ module "vm2" {
   source = "../modules/vm_ubuntu_24"
   name = "vt2_dhcp_lcoal_network"
   vm_profile = local.vm_profile
-  local_network_configuration = {
-    is_enabled = true
-    ip         = ""
-    mask       = ""
-    gateway4 = ""
-    nameservers = []
-    # gateway4   = ""
-    # nameservers = []
-    dhcp_mode  = "dhcp"
+  local_network = {
+    profile = local.local_network_profile_dhcp
   }
-  bridge_network_configuration = {
+  bridge_network = {
+    profile = local.bridge_network_profile_dhcp
+  }
+}
+
+module "vm3" {
+  source = "../modules/vm_ubuntu_24"
+  name = "vt3_dhcp_local_a"
+  vm_profile = local.vm_profile
+  local_network = {
+    profile = local.local_network_profile_dhcp
+  }
+  bridge_network = {
     is_enabled = false
-    ip         = ""
-    mask       = ""
-    gateway4   = ""
-    nameservers = []
-    dhcp_mode  = "dhcp"
+  }
+}
+
+module "vm4" {
+  source = "../modules/vm_ubuntu_24"
+  name = "vt4_dhcp_bridge_a"
+  vm_profile = local.vm_profile
+  local_network = {
+    is_enabled = false
+  }
+  bridge_network = {
+    profile = local.bridge_network_profile_dhcp
+  }
+}
+
+module "vm5" {
+  source = "../modules/vm_ubuntu_24"
+  name = "vt5_dhcp_local_b"
+  vm_profile = local.vm_profile
+  local_network = {
+    profile = local.local_network_profile_dhcp
+  }
+}
+
+module "vm6" {
+  source = "../modules/vm_ubuntu_24"
+  name = "vt6_dhcp_bridge_b"
+  vm_profile = local.vm_profile
+  bridge_network = {
+    profile = local.bridge_network_profile_dhcp
   }
 }
