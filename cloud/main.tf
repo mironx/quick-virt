@@ -11,7 +11,7 @@ provider "libvirt" {
 }
 
 locals {
-  machine_profile = {
+  vm_profile = {
     vcpu = 1
     memory = 2048
     user_name = "devx"
@@ -21,12 +21,8 @@ locals {
 
 module "vm1" {
   source = "../modules/vm_ubuntu_24"
-  vm = {
-    name = "vt1_static_lcoal_network"
-    vcpu         = local.machine_profile.vcpu
-    memory       = local.machine_profile.memory
-    user_name    = local.machine_profile.user_name
-  }
+  name = "vt1_static_lcoal_network"
+  vm_profile = local.vm_profile
   local_network_configuration = {
     is_enabled = true
     ip         = "192.168.100.16"
@@ -51,12 +47,8 @@ module "vm1" {
 
 module "vm2" {
   source = "../modules/vm_ubuntu_24"
-  vm = {
-    name = "vt2_dhcp_lcoal_network"
-    vcpu         = local.machine_profile.vcpu
-    memory       = local.machine_profile.memory
-    user_name    = local.machine_profile.user_name
-  }
+  name = "vt2_dhcp_lcoal_network"
+  vm_profile = local.vm_profile
   local_network_configuration = {
     is_enabled = true
     ip         = ""

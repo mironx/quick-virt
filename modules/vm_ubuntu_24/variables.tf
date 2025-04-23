@@ -1,6 +1,14 @@
-variable "vm" {
+variable "name" {
+    type = string
+    description = "Name of the VM"
+    validation {
+        condition     = length(var.name) > 0
+        error_message = "VM name must be defined and not empty"
+    }
+}
+
+variable "vm_profile" {
   type = object({
-    name         = string
     image_source = optional(string)
     vcpu         = number
     memory       = number

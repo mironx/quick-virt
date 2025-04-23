@@ -11,13 +11,12 @@ terraform {
 }
 
 locals {
-  current_vm = {
-    name = coalesce(var.vm.name, null)
-    image_source = coalesce(var.vm.image_source, "/var/lib/libvirt/images/ubuntu-2204.qcow2.base")
-    vcpu = coalesce(var.vm.vcpu, null)
-    memory = coalesce(var.vm.memory, null)
-    user_name = coalesce(var.vm.user_name, null)
-    network_desc_order = coalesce(var.vm.network_desc_order, false)
+  current_vm_profile = {
+    image_source = coalesce(var.vm_profile.image_source, "/var/lib/libvirt/images/ubuntu-2204.qcow2.base")
+    vcpu = coalesce(var.vm_profile.vcpu, null)
+    memory = coalesce(var.vm_profile.memory, null)
+    user_name = coalesce(var.vm_profile.user_name, null)
+    network_desc_order = coalesce(var.vm_profile.network_desc_order, false)
   }
 }
 
@@ -54,14 +53,14 @@ locals {
   })
 
   user_data = templatefile("${path.module}/templates/user-data.tmpl", {
-    local_hostname  = local.current_vm.name
-    user_name = local.current_vm.user_name
+    local_hostname  = var.name
+    user_name = local.current_vm_profile.user_name
     user_password = local.user_password
   })
 
   meta_data = templatefile("${path.module}/templates/user-data.tmpl", {
-    local_hostname  = local.current_vm.name
-    user_name = local.current_vm.user_name
+    local_hostname  = var.name
+    user_name = local.current_vm_profile.user_name
     user_password = local.user_password
   })
 }
@@ -69,15 +68,15 @@ locals {
 //-------------------------------------------------------------------------------
 
 resource "libvirt_volume" "vm-disk" {
-  name   = "${local.current_vm.name}.qcow2"
+  name   = "${var.name}.qcow2"
   pool   = "default"
-  source = local.current_vm.image_source
+  source = local.current_vm_profile.image_source
   format = "qcow2"
   depends_on = [null_resource.validate]
 }
 
 resource "libvirt_cloudinit_disk" "cloudinit" {
-  name           = "${local.current_vm.name}_cloudinit.iso"
+  name           = "${var.name}_cloudinit.iso"
   network_config = local.network_config
   user_data      = local.user_data
   meta_data      = local.meta_data
@@ -86,9 +85,9 @@ resource "libvirt_cloudinit_disk" "cloudinit" {
 }
 
 resource "libvirt_domain" "vm" {
-  name   = local.current_vm.name
-  memory = local.current_vm.memory
-  vcpu   = local.current_vm.vcpu
+  name   = var.name
+  memory = local.current_vm_profile.memory
+  vcpu   = local.current_vm_profile.vcpu
 
   disk {
     volume_id = libvirt_volume.vm-disk.id
@@ -101,14 +100,14 @@ resource "libvirt_domain" "vm" {
   # If network_desc_order is false, local network interface is first
   # If network_desc_order is true, bridge network interface is first
   dynamic "network_interface" {
-    for_each = !local.current_vm.network_desc_order && var.local_network_configuration.is_enabled ? [1] : []
+    for_each = !local.current_vm_profile.network_desc_order && var.local_network_configuration.is_enabled ? [1] : []
     content {
       network_name = local.local_network_name
     }
   }
 
   dynamic "network_interface" {
-    for_each = !local.current_vm.network_desc_order && var.bridge_network_configuration.is_enabled ? [1] : []
+    for_each = !local.current_vm_profile.network_desc_order && var.bridge_network_configuration.is_enabled ? [1] : []
     content {
       network_name = local.bridge_network_name
       bridge = "br0"
@@ -121,7 +120,7 @@ resource "libvirt_domain" "vm" {
   # If network_desc_order is true, bridge network interface is first
   # If network_desc_order is false, local network interface is first
   dynamic "network_interface" {
-    for_each = local.current_vm.network_desc_order && var.bridge_network_configuration.is_enabled ? [1] : []
+    for_each = local.current_vm_profile.network_desc_order && var.bridge_network_configuration.is_enabled ? [1] : []
     content {
       network_name = local.bridge_network_name
       bridge = "br0"
@@ -129,7 +128,7 @@ resource "libvirt_domain" "vm" {
   }
 
   dynamic "network_interface" {
-    for_each = local.current_vm.network_desc_order && var.local_network_configuration.is_enabled ? [1] : []
+    for_each = local.current_vm_profile.network_desc_order && var.local_network_configuration.is_enabled ? [1] : []
     content {
       network_name = local.local_network_name
     }
