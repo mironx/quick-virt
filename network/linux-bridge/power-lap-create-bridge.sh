@@ -1,3 +1,3 @@
 #!/bin/bash
 
-./create-bridge.sh --phys-if wlp0s20f3 --bridge-name br0
+./create-bridge.sh --phys-if enp0s31f6 --bridge-name br0
