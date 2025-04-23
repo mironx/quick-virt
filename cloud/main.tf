@@ -10,16 +10,22 @@ provider "libvirt" {
   uri = "qemu:///system"
 }
 
+locals {
+  machine_profile = {
+    vcpu = 1
+    memory = 2048
+    user_name = "devx"
+  }
+}
+
 
 module "vm1" {
   source = "../modules/vm_ubuntu_24"
   vm = {
     name = "vt1_static_lcoal_network"
-    image_source = "/var/lib/libvirt/images/ubuntu-2204.qcow2.base"
-    vcpu         = 2
-    memory       = 2048
-    user_name    = "devx"
-    network_desc_order = false
+    vcpu         = local.machine_profile.vcpu
+    memory       = local.machine_profile.memory
+    user_name    = local.machine_profile.user_name
   }
   local_network_configuration = {
     is_enabled = true
@@ -47,11 +53,9 @@ module "vm2" {
   source = "../modules/vm_ubuntu_24"
   vm = {
     name = "vt2_dhcp_lcoal_network"
-    image_source = "/var/lib/libvirt/images/ubuntu-2204.qcow2.base"
-    vcpu         = 2
-    memory       = 2048
-    user_name    = "devx"
-    network_desc_order = false
+    vcpu         = local.machine_profile.vcpu
+    memory       = local.machine_profile.memory
+    user_name    = local.machine_profile.user_name
   }
   local_network_configuration = {
     is_enabled = true

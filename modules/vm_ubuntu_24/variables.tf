@@ -1,31 +1,12 @@
 variable "vm" {
   type = object({
     name         = string
-    image_source = string
+    image_source = optional(string)
     vcpu         = number
     memory       = number
     user_name    = string
-    network_desc_order = bool
+    network_desc_order = optional(bool)
   })
-
-  default = {
-    name         = "vm_test_1"
-    image_source = "/var/lib/libvirt/images/ubuntu-2204.qcow2.base"
-    vcpu         = 2
-    memory       = 2048
-    user_name    = "devx"
-    network_desc_order = false
-  }
-
-  validation {
-    condition     = var.vm.name != null && var.vm.name != ""
-    error_message = "Variable vm.name must be defined."
-  }
-
-  validation {
-    condition     = var.vm.image_source != null && var.vm.image_source != ""
-    error_message = "Variable vm.image_source must be defined."
-  }
 }
 
 

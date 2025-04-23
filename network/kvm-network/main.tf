@@ -10,6 +10,7 @@ provider "libvirt" {
   uri = "qemu:///system"
 }
 
+
 locals {
   local_network_name = "local-network"
   local_network_addresses = ["192.168.100.0/24"]

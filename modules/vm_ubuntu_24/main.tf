@@ -1,10 +1,26 @@
 terraform {
- required_providers {
+  required_providers {
     libvirt = {
       source = "dmacvicar/libvirt"
     }
+    null = {
+      source  = "hashicorp/null"
+      version = "3.2.3"
+    }
   }
 }
+
+locals {
+  current_vm = {
+    name = coalesce(var.vm.name, null)
+    image_source = coalesce(var.vm.image_source, "/var/lib/libvirt/images/ubuntu-2204.qcow2.base")
+    vcpu = coalesce(var.vm.vcpu, null)
+    memory = coalesce(var.vm.memory, null)
+    user_name = coalesce(var.vm.user_name, null)
+    network_desc_order = coalesce(var.vm.network_desc_order, false)
+  }
+}
+
 
 //-------------------------------------------------------------------------------
 locals {
@@ -38,14 +54,14 @@ locals {
   })
 
   user_data = templatefile("${path.module}/templates/user-data.tmpl", {
-    local_hostname  = var.vm.name
-    user_name = var.vm.user_name
+    local_hostname  = local.current_vm.name
+    user_name = local.current_vm.user_name
     user_password = local.user_password
   })
 
   meta_data = templatefile("${path.module}/templates/user-data.tmpl", {
-    local_hostname  = var.vm.name
-    user_name = var.vm.user_name
+    local_hostname  = local.current_vm.name
+    user_name = local.current_vm.user_name
     user_password = local.user_password
   })
 }
@@ -53,24 +69,26 @@ locals {
 //-------------------------------------------------------------------------------
 
 resource "libvirt_volume" "vm-disk" {
-  name   = "${var.vm.name}.qcow2"
+  name   = "${local.current_vm.name}.qcow2"
   pool   = "default"
-  source = var.vm.image_source
+  source = local.current_vm.image_source
   format = "qcow2"
+  depends_on = [null_resource.validate]
 }
 
 resource "libvirt_cloudinit_disk" "cloudinit" {
-  name           = "${var.vm.name}_cloudinit.iso"
+  name           = "${local.current_vm.name}_cloudinit.iso"
   network_config = local.network_config
   user_data      = local.user_data
   meta_data      = local.meta_data
   pool           = "default"
+  depends_on = [null_resource.validate]
 }
 
 resource "libvirt_domain" "vm" {
-  name   = var.vm.name
-  memory = var.vm.memory
-  vcpu   = var.vm.vcpu
+  name   = local.current_vm.name
+  memory = local.current_vm.memory
+  vcpu   = local.current_vm.vcpu
 
   disk {
     volume_id = libvirt_volume.vm-disk.id
@@ -83,14 +101,14 @@ resource "libvirt_domain" "vm" {
   # If network_desc_order is false, local network interface is first
   # If network_desc_order is true, bridge network interface is first
   dynamic "network_interface" {
-    for_each = !var.vm.network_desc_order && var.local_network_configuration.is_enabled ? [1] : []
+    for_each = !local.current_vm.network_desc_order && var.local_network_configuration.is_enabled ? [1] : []
     content {
       network_name = local.local_network_name
     }
   }
 
   dynamic "network_interface" {
-    for_each = !var.vm.network_desc_order && var.bridge_network_configuration.is_enabled ? [1] : []
+    for_each = !local.current_vm.network_desc_order && var.bridge_network_configuration.is_enabled ? [1] : []
     content {
       network_name = local.bridge_network_name
       bridge = "br0"
@@ -103,7 +121,7 @@ resource "libvirt_domain" "vm" {
   # If network_desc_order is true, bridge network interface is first
   # If network_desc_order is false, local network interface is first
   dynamic "network_interface" {
-    for_each = var.vm.network_desc_order && var.bridge_network_configuration.is_enabled ? [1] : []
+    for_each = local.current_vm.network_desc_order && var.bridge_network_configuration.is_enabled ? [1] : []
     content {
       network_name = local.bridge_network_name
       bridge = "br0"
@@ -111,7 +129,7 @@ resource "libvirt_domain" "vm" {
   }
 
   dynamic "network_interface" {
-    for_each = var.vm.network_desc_order && var.local_network_configuration.is_enabled ? [1] : []
+    for_each = local.current_vm.network_desc_order && var.local_network_configuration.is_enabled ? [1] : []
     content {
       network_name = local.local_network_name
     }
@@ -143,10 +161,4 @@ resource "libvirt_domain" "vm" {
     libvirt_volume.vm-disk,
     libvirt_cloudinit_disk.cloudinit,
   ]
-}
-
-
-output "network_config_rendered" {
-  value = local.network_config
-  sensitive = false  # Ustaw na true, jeśli zawiera wrażliwe dane
 }
