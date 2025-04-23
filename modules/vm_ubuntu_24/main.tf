@@ -11,9 +11,8 @@ locals {
   local_network_name = "local-network"
   bridge_network_name = "bridge-network"
   local_dhcp = var.local_network_configuration.is_enabled && var.local_network_configuration.dhcp_mode == "dhcp"
-  local_part_dhcp = var.local_network_configuration.is_enabled && var.local_network_configuration.dhcp_mode == "ips_static_other_dhcp"
   bridge_dhcp = var.bridge_network_configuration.is_enabled && var.bridge_network_configuration.dhcp_mode == "dhcp"
-  bridge_part_dhcp = var.bridge_network_configuration.is_enabled && var.bridge_network_configuration.dhcp_mode == "ips_static_other_dhcp"
+
 
   interface_network1 = "ens3"
   interface_network2 = var.local_network_configuration.is_enabled ? "ens4" : "ens3"
@@ -27,7 +26,7 @@ locals {
     local_network_gateway4 = var.local_network_configuration.gateway4,
     local_network_nameservers = var.local_network_configuration.nameservers
     local_dhcp = local.local_dhcp
-    local_part_dhcp = local.local_part_dhcp
+
 
     interface_network2 = local.interface_network2
     bridge_is_enabled = var.bridge_network_configuration.is_enabled,
@@ -36,7 +35,6 @@ locals {
     bridge_network_gateway4 = var.bridge_network_configuration.gateway4,
     bridge_network_nameservers = var.bridge_network_configuration.nameservers
     bridge_dhcp = local.bridge_dhcp
-    bridge_part_dhcp = local.bridge_part_dhcp
   })
 
   user_data = templatefile("${path.module}/templates/user-data.tmpl", {

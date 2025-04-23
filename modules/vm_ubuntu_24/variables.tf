@@ -38,7 +38,7 @@ variable "local_network_configuration" {
     mask = string
     gateway4 = string
     nameservers = list(string)
-    dhcp_mode = string # enum: "dhcp", "ips_static_other_dhcp", "static"
+    dhcp_mode = string # enum: "dhcp",  "static"
   })
   # default = {
   #   is_enabled = true
