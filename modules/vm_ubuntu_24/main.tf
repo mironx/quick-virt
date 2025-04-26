@@ -77,7 +77,6 @@ locals {
 
   interface_network1 = "ens3"
   interface_network2 = local.current_local_network.is_enabled ? "ens4" : "ens3"
-  user_password = trimspace(file("${path.module}/pswd"))
 
   network_config = templatefile("${path.module}/templates/network-config.tmpl", {
     interface_network1 = local.interface_network1
@@ -98,16 +97,11 @@ locals {
     bridge_dhcp = local.bridge_dhcp
   })
 
-  user_data = templatefile("${path.module}/templates/user-data.tmpl", {
-    local_hostname  = var.name
-    user_name = local.current_vm_profile.user_name
-    user_password = local.user_password
-  })
+  user_data = replace(var.user_data, "HOST_NAME", var.name)
 
-  meta_data = templatefile("${path.module}/templates/user-data.tmpl", {
-    local_hostname  = var.name
-    user_name = local.current_vm_profile.user_name
-    user_password = local.user_password
+  meta_data = templatefile("${path.module}/templates/meta-data.tmpl", {
+    instance_id  = var.name
+    local_hostname = var.name
   })
 }
 
