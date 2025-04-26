@@ -9,4 +9,9 @@ users:
     plain_text_passwd: '${user_password}'
 
 packages:
+  - qemu-guest-agent
   - nginx
+  - tilde
+
+runcmd:
+  - systemctl enable --now qemu-guest-agent
