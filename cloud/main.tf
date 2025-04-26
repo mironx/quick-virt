@@ -34,7 +34,6 @@ locals {
 }
 
 
-
 module "vm1" {
   source = "../modules/vm_ubuntu_24"
   name = "vt1_static_lcoal_network"

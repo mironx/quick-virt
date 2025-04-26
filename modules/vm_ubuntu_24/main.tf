@@ -106,6 +106,9 @@ locals {
   })
 }
 
+locals {
+  enable_guest_agent = can(regex("qemu-guest-agent", local.user_data))
+}
 //-------------------------------------------------------------------------------
 
 resource "libvirt_volume" "vm-disk" {
@@ -151,7 +154,7 @@ resource "libvirt_domain" "vm" {
     for_each = !local.current_vm_profile.network_desc_order && local.current_bridge_network.is_enabled ? [1] : []
     content {
       network_name = local.bridge_network_name
-      bridge = local.current_bridge_network.profile.bridge
+      bridge       = local.current_bridge_network.profile.bridge
     }
   }
   # ------------------------------------------------------------------------------------------
@@ -164,7 +167,7 @@ resource "libvirt_domain" "vm" {
     for_each = local.current_vm_profile.network_desc_order && local.current_bridge_network.is_enabled ? [1] : []
     content {
       network_name = local.bridge_network_name
-      bridge = local.current_bridge_network.profile.bridge
+      bridge       = local.current_bridge_network.profile.bridge
     }
   }
 
@@ -196,6 +199,8 @@ resource "libvirt_domain" "vm" {
     listen_type = "address"
     autoport    = true
   }
+
+  qemu_agent = local.enable_guest_agent
 
   depends_on = [
     libvirt_volume.vm-disk,
