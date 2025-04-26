@@ -23,11 +23,13 @@ locals {
     ip = try(coalesce(var.local_network.ip,""),"")
     is_enabled = coalesce(var.local_network.is_enabled, true)
     profile = coalesce(var.local_network.is_enabled, true) ? {
+      kvm_network_name = try(coalesce(var.local_network.profile.kvm_network_name, null),"")
       dhcp_mode   = coalesce(var.local_network.profile.dhcp_mode, "dhcp")
       mask        = try(coalesce(var.local_network.profile.mask, null),"")
       gateway4    = try(coalesce(var.local_network.profile.gateway4, null),"")
       nameservers = coalesce(var.local_network.profile.nameservers, [])
     } : {
+      kvm_network_name = "?"
       dhcp_mode   = "?"
       mask        = "?"
       gateway4    = "?"
@@ -39,12 +41,14 @@ locals {
     ip = try(coalesce(var.bridge_network.ip,""),"?")
     is_enabled = coalesce(var.bridge_network.is_enabled, true)
     profile = coalesce(var.bridge_network.is_enabled, true) ? {
+      kvm_network_name = try(coalesce(var.bridge_network.profile.kvm_network_name, null),"")
       dhcp_mode = coalesce(var.bridge_network.profile.dhcp_mode, "dhcp")
       mask = try(coalesce(var.bridge_network.profile.mask, null),"")
       gateway4 = try(coalesce(var.bridge_network.profile.gateway4, null),"")
       nameservers = coalesce(var.bridge_network.profile.nameservers, [])
       bridge = coalesce(var.bridge_network.profile.bridge, "")
     } : {
+      kvm_network_name = "?"
       dhcp_mode   = "?"
       mask        = "?"
       gateway4    = "?"
@@ -61,6 +65,7 @@ locals {
 #   lifecycle {
 #     precondition {
 #       condition = local.current_local_network == null
+#       //error_message = jsonencode(var.local_network)
 #       error_message = jsonencode(local.current_local_network)
 #     }
 #   }
@@ -70,8 +75,6 @@ locals {
 
 //-------------------------------------------------------------------------------
 locals {
-  local_network_name = "local-network"
-  bridge_network_name = "bridge-network"
   local_dhcp = local.current_local_network.is_enabled && local.current_local_network.profile.dhcp_mode == "dhcp"
   bridge_dhcp = local.current_bridge_network.is_enabled && local.current_bridge_network.profile.dhcp_mode == "dhcp"
 
@@ -147,14 +150,14 @@ resource "libvirt_domain" "vm" {
   dynamic "network_interface" {
     for_each = !local.current_vm_profile.network_desc_order && local.current_local_network.is_enabled ? [1] : []
     content {
-      network_name = local.local_network_name
+      network_name = local.current_local_network.profile.kvm_network_name
     }
   }
 
   dynamic "network_interface" {
     for_each = !local.current_vm_profile.network_desc_order && local.current_bridge_network.is_enabled ? [1] : []
     content {
-      network_name = local.bridge_network_name
+      network_name = local.current_bridge_network.profile.kvm_network_name
       bridge       = local.current_bridge_network.profile.bridge
     }
   }

@@ -9,6 +9,7 @@ variable "vm_profile" {
 
 variable "local_network" {
   type = object({
+    kvm_network_name = string
     mask        = string
     gateway4    = string
     nameservers = list(string)
@@ -19,6 +20,7 @@ variable "local_network" {
 
 variable "bridge_network" {
   type = object({
+    kvm_network_name = string
     mask        = string
     gateway4    = string
     nameservers = list(string)

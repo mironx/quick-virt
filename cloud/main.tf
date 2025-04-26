@@ -16,9 +16,12 @@ locals {
   bridge_network_profile_static = var.bridge_network
 
   local_network_profile_dhcp = {
+    kvm_network_name = local.local_network_profile_static.kvm_network_name
     dhcp_mode  = "dhcp"
+
   }
   bridge_network_profile_dhcp = {
+    kvm_network_name = local.bridge_network_profile_static.kvm_network_name
     dhcp_mode  = "dhcp"
     bridge = "br0"
   }
