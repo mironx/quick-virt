@@ -7,6 +7,11 @@ variable "name" {
     }
 }
 
+variable "user_data" {
+    type = string
+    description = "User data for cloud-init"
+}
+
 variable "vm_profile" {
   type = object({
     image_source = optional(string)

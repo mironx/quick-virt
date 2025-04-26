@@ -1,0 +1,12 @@
+#cloud-config
+hostname: HOST_NAME
+
+users:
+  - name: ${user_name}
+    groups: sudo
+    shell: /bin/bash
+    lock_passwd: false
+    plain_text_passwd: '${user_password}'
+
+packages:
+  - nginx
