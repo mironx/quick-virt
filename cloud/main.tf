@@ -11,24 +11,10 @@ provider "libvirt" {
 }
 
 locals {
-  vm_profile = {
-    vcpu = 1
-    memory = 2048
-    user_name = "devx"
-  }
-  local_network_profile_static = {
-    mask       = "24"
-    gateway4 = "192.168.100.1"
-    nameservers = ["192.168.100.1"]
-    dhcp_mode  = "static"
-  }
-  bridge_network_profile_static = {
-    mask       = "12"
-    gateway4 = "172.16.0.1"
-    nameservers = ["172.16.0.1"]
-    dhcp_mode  = "static"
-    bridge = "br0"
-  }
+  vm_profile = var.vm_profile
+  local_network_profile_static = var.local_network
+  bridge_network_profile_static = var.bridge_network
+
   local_network_profile_dhcp = {
     dhcp_mode  = "dhcp"
   }
@@ -36,12 +22,14 @@ locals {
     dhcp_mode  = "dhcp"
     bridge = "br0"
   }
-  user_password = trimspace(file("${path.module}/pswd"))
+
+  user = var.user
 }
 
 locals {
   user_data = templatefile("${path.module}/templates/user-data.tmpl", {
-    user_password  = local.user_password
+    user_name     = local.user.name
+    user_password  = local.user.password
   })
 }
 
