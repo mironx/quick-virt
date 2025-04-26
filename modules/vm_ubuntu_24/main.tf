@@ -107,6 +107,7 @@ locals {
 }
 
 locals {
+  // Enable guest agent if the user_data contains "qemu-guest-agent"
   enable_guest_agent = can(regex("qemu-guest-agent", local.user_data))
 }
 //-------------------------------------------------------------------------------
