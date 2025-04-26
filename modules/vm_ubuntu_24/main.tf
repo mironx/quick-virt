@@ -18,6 +18,7 @@ locals {
     user_name = coalesce(var.vm_profile.user_name, null)
     network_desc_order = coalesce(var.vm_profile.network_desc_order, false)
   }
+  validated_user_data = yamldecode(var.user_data)
   current_local_network = {
     ip = try(coalesce(var.local_network.ip,""),"")
     is_enabled = coalesce(var.local_network.is_enabled, true)

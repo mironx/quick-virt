@@ -1,7 +1,4 @@
 resource "null_resource" "validate" {
-  triggers = {
-    always_run = timestamp()
-  }
 }
 
 resource "null_resource" "validate_vm" {
