@@ -11,9 +11,10 @@ provider "libvirt" {
 }
 
 locals {
+  networks = var.networks
   vm_profile = var.vm_profile
-  local_network_profile_static = var.local_network
-  bridge_network_profile_static = var.bridge_network
+  local_network_profile_static = local.networks["local"]
+  bridge_network_profile_static = local.networks["bridge"]
 
   local_network_profile_dhcp = {
     kvm_network_name = local.local_network_profile_static.kvm_network_name

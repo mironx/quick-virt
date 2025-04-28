@@ -1,20 +1,3 @@
-variable "vm_profile" {
-  type = object({
-    vcpu      = number
-    memory    = number
-    user_name = string
-  })
-  description = "VM profile configuration."
-}
-
-variable "user" {
-  type = object({
-    name     = string
-    password = string
-  })
-  description = "User profile configuration."
-}
-
 variable "networks" {
   type = map(object({
     mode             = string
