@@ -27,6 +27,7 @@ variable "local_network" {
     ip = optional(string)
     is_enabled = optional(bool)
     profile = optional(object({
+      kvm_network_name = optional(string)
       dhcp_mode = optional(string)
       mask      = optional(string)
       gateway4  = optional(string)
@@ -45,6 +46,7 @@ variable "bridge_network" {
     ip = optional(string)
     is_enabled = optional(bool)
     profile = optional(object({
+      kvm_network_name = optional(string)
       dhcp_mode = optional(string)
       mask      = optional(string)
       gateway4  = optional(string)

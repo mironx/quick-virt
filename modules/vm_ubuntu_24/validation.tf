@@ -37,8 +37,13 @@ resource "null_resource" "validate_local_network" {
   lifecycle {
     precondition {
       condition     = !(local.current_local_network.is_enabled && local.current_local_network.profile == null)
-      error_message = "local_network.profile must be set when is_enabled is true"
+      error_message = "local_network.profile must be set when is_enabled is true  [vm_name:${var.name}]"
     }
+
+    # precondition {
+    #   condition = !(local.current_local_network.is_enabled && (local.current_local_network.profile.kvm_network_name == null || local.current_local_network.profile.kvm_network_name == ""))
+    #   error_message = "local_network.profile.network_name must be set when is_enabled is true [vm_name:${var.name}]"
+    # }
 
     precondition {
       condition     = local.current_local_network.profile.dhcp_mode != "static" || (
@@ -61,8 +66,13 @@ resource "null_resource" "validate_bridge_network" {
   lifecycle {
     precondition {
       condition     = !(local.current_bridge_network.is_enabled && local.current_bridge_network.profile == null)
-      error_message = "bridge_network.profile must be set when is_enabled is true"
+      error_message = "bridge_network.profile must be set when is_enabled is true  [vm_name:${var.name}]"
     }
+
+    # precondition {
+    #   condition = !(local.current_bridge_network.is_enabled && (local.current_bridge_network.profile.kvm_network_name == null || local.current_bridge_network.profile.kvm_network_name == ""))
+    #   error_message = "current_bridge_network.profile.network_name must be set when is_enabled is true  [vm_name:${var.name}]"
+    # }
 
     precondition {
       condition     = local.current_bridge_network.profile.dhcp_mode != "static" || (
