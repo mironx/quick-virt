@@ -15,8 +15,12 @@ locals {
     image_source = coalesce(var.vm_profile.image_source, "/var/lib/libvirt/images/ubuntu-2204.qcow2.base")
     vcpu = coalesce(var.vm_profile.vcpu, null)
     memory = coalesce(var.vm_profile.memory, null)
-    user_name = coalesce(var.vm_profile.user_name, null)
     network_desc_order = coalesce(var.vm_profile.network_desc_order, false)
+    cpu = var.vm_profile.cpu != null ? {
+      mode = var.vm_profile.cpu.mode
+    } : {
+      mode = null
+    }
   }
   validated_user_data = yamldecode(var.user_data)
   current_local_network = {
@@ -66,7 +70,8 @@ locals {
 #     precondition {
 #       condition = local.current_local_network == null
 #       //error_message = jsonencode(var.local_network)
-#       error_message = jsonencode(local.current_local_network)
+#       //error_message = jsonencode(local.current_local_network)
+#       error_message = "cpu.mode=${var.vm_profile.cpu.mode}"
 #     }
 #   }
 # }
@@ -75,7 +80,7 @@ locals {
 
 //-------------------------------------------------------------------------------
 locals {
-  local_dhcp = local.current_local_network.is_enabled && local.current_local_network.profile.dhcp_mode == "dhcp"
+  local_dhcp  = local.current_local_network.is_enabled && local.current_local_network.profile.dhcp_mode == "dhcp"
   bridge_dhcp = local.current_bridge_network.is_enabled && local.current_bridge_network.profile.dhcp_mode == "dhcp"
 
 
@@ -83,30 +88,34 @@ locals {
   interface_network2 = local.current_local_network.is_enabled ? "ens4" : "ens3"
 
   network_config = templatefile("${path.module}/templates/network-config.tmpl", {
-    interface_network1 = local.interface_network1
-    local_is_enabled = local.current_local_network.is_enabled,
-    local_network_ip = local.current_local_network.ip,
-    local_network_mask = local.current_local_network.profile.mask,
-    local_network_gateway4 = local.current_local_network.profile.gateway4,
+    interface_network1        = local.interface_network1
+    local_is_enabled          = local.current_local_network.is_enabled,
+    local_network_ip          = local.current_local_network.ip,
+    local_network_mask        = local.current_local_network.profile.mask,
+    local_network_gateway4    = local.current_local_network.profile.gateway4,
     local_network_nameservers = local.current_local_network.profile.nameservers
-    local_dhcp = local.local_dhcp
+    local_dhcp                = local.local_dhcp
 
 
-    interface_network2 = local.interface_network2
-    bridge_is_enabled = local.current_bridge_network.is_enabled,
-    bridge_network_ip = local.current_bridge_network.ip,
-    bridge_network_mask = local.current_bridge_network.profile.mask,
-    bridge_network_gateway4 = local.current_bridge_network.profile.gateway4,
+    interface_network2         = local.interface_network2
+    bridge_is_enabled          = local.current_bridge_network.is_enabled,
+    bridge_network_ip          = local.current_bridge_network.ip,
+    bridge_network_mask        = local.current_bridge_network.profile.mask,
+    bridge_network_gateway4    = local.current_bridge_network.profile.gateway4,
     bridge_network_nameservers = local.current_bridge_network.profile.nameservers
-    bridge_dhcp = local.bridge_dhcp
+    bridge_dhcp                = local.bridge_dhcp
   })
 
   user_data = replace(var.user_data, "HOST_NAME", var.name)
 
   meta_data = templatefile("${path.module}/templates/meta-data.tmpl", {
-    instance_id  = var.name
+    instance_id    = var.name
     local_hostname = var.name
   })
+
+  running     = var.running
+  autostart   = var.autostart
+  description = var.description
 }
 
 locals {
@@ -186,6 +195,10 @@ resource "libvirt_domain" "vm" {
   # see: https://github.com/dmacvicar/terraform-provider-libvirt/blob/main/examples/v0.13/ubuntu/ubuntu-example.tf
   # why we have double console (it is some bug in cloud init)
 
+  cpu {
+    mode = local.current_vm_profile.cpu.mode
+  }
+
   console {
     type        = "pty"
     target_port = "0"
@@ -203,6 +216,11 @@ resource "libvirt_domain" "vm" {
     listen_type = "address"
     autoport    = true
   }
+
+  running = local.running
+  autostart = local.autostart
+  description = local.description
+
 
   qemu_agent = local.enable_guest_agent
 

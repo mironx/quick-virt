@@ -1,8 +1,10 @@
 variable "vm_profile" {
   type = object({
     vcpu      = number
-    memory    = number
-    user_name = string
+    memory    = number,
+    cpu = optional(object({
+      mode = optional(string)
+    }))
   })
   description = "VM profile configuration."
 }
