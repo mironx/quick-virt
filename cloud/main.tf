@@ -13,7 +13,7 @@ provider "libvirt" {
 locals {
   networks = var.networks
   vm_profile = var.vm_profile
-  local_network_profile_static = local.networks["local"]
+  local_network_profile_static = local.networks["local0"]
   bridge_network_profile_static = local.networks["bridge"]
 
   local_network_profile_dhcp = {
@@ -43,8 +43,6 @@ module "vm1" {
   name = "vt1_static_lcoal_network"
   user_data = local.user_data
   vm_profile = local.vm_profile
-  running = false
-  description = "abc ha ha"
   local_network = {
     ip         = "192.168.100.16"
     profile = local.local_network_profile_static
