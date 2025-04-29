@@ -43,6 +43,8 @@ module "vm1" {
   name = "vt1_static_lcoal_network"
   user_data = local.user_data
   vm_profile = local.vm_profile
+  running = false
+  description = "abc ha ha"
   local_network = {
     ip         = "192.168.100.16"
     profile = local.local_network_profile_static

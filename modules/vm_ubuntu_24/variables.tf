@@ -7,6 +7,24 @@ variable "name" {
     }
 }
 
+variable "running" {
+  type = bool
+  description = "Use false to turn off the instance. If not specified, true is assumed and the instance, if stopped, will be started at next apply."
+  default = true
+}
+
+variable "autostart" {
+  type = bool
+  description = "Set to true to start the domain on host boot up. If not specified false is assumed."
+  default = false
+}
+
+variable "description" {
+  type = string
+  description = "The description for domain. Changing this forces a new resource to be created. This data is not used by libvirt in any way, it can contain any information the user wants."
+  default = null
+}
+
 variable "user_data" {
     type = string
     description = "User data for cloud-init"
@@ -17,8 +35,10 @@ variable "vm_profile" {
     image_source = optional(string)
     vcpu         = number
     memory       = number
-    user_name    = string
     network_desc_order = optional(bool)
+    cpu =  optional(object({
+       mode = optional(string)
+    }))
   })
 }
 

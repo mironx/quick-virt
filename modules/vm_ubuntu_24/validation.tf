@@ -14,11 +14,6 @@ resource "null_resource" "validate_vm" {
     }
 
     precondition {
-      condition     = local.current_vm_profile.user_name != null && local.current_vm_profile.user_name != ""
-      error_message = "VM user_name must be defined and not empty [vm_name:${var.name}]"
-    }
-
-    precondition {
       condition     = local.current_vm_profile.image_source != null && local.current_vm_profile.image_source != ""
       error_message = "VM image_source must be defined and not empty [vm_name:${var.name}]"
     }
