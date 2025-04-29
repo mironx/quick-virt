@@ -116,6 +116,7 @@ locals {
   running     = var.running
   autostart   = var.autostart
   description = var.description
+  storage_pool = var.storage_pool
 }
 
 locals {
@@ -126,7 +127,7 @@ locals {
 
 resource "libvirt_volume" "vm-disk" {
   name   = "${var.name}.qcow2"
-  pool   = "default"
+  pool   = local.storage_pool
   source = local.current_vm_profile.image_source
   format = "qcow2"
   depends_on = [null_resource.validate]
@@ -137,8 +138,8 @@ resource "libvirt_cloudinit_disk" "cloudinit" {
   network_config = local.network_config
   user_data      = local.user_data
   meta_data      = local.meta_data
-  pool           = "default"
-  depends_on = [null_resource.validate]
+  pool           = local.storage_pool
+  depends_on     = [null_resource.validate]
 }
 
 resource "libvirt_domain" "vm" {

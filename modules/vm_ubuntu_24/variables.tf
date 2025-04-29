@@ -25,6 +25,12 @@ variable "description" {
   default = null
 }
 
+variable "storage_pool" {
+  type = string
+  description = "The storage pool to use for the VM disk"
+  default = "default"
+}
+
 variable "user_data" {
     type = string
     description = "User data for cloud-init"
