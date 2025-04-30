@@ -1,15 +1,10 @@
 terraform {
- required_providers {
+  required_providers {
     libvirt = {
       source = "dmacvicar/libvirt"
     }
   }
 }
-
-provider "libvirt" {
-  uri = "qemu:///system"
-}
-
 locals {
   networks = var.networks
 }
