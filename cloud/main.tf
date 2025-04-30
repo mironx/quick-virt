@@ -39,7 +39,7 @@ locals {
 
 
 module "vm1" {
-  source = "../modules/vm_ubuntu_24"
+  source = "../modules/quick_vm"
   name = "vt1_static_lcoal_network"
   user_data = local.user_data
   vm_profile = local.vm_profile
@@ -54,7 +54,7 @@ module "vm1" {
 }
 
 module "vm2" {
-  source = "../modules/vm_ubuntu_24"
+  source = "../modules/quick_vm"
   name = "vt2_dhcp_lcoal_network"
   user_data = local.user_data
   vm_profile = local.vm_profile
@@ -67,7 +67,7 @@ module "vm2" {
 }
 
 module "vm3" {
-  source = "../modules/vm_ubuntu_24"
+  source = "../modules/quick_vm"
   name = "vt3_dhcp_local_a"
   user_data = local.user_data
   vm_profile = local.vm_profile
@@ -80,7 +80,7 @@ module "vm3" {
 }
 
 module "vm4" {
-  source = "../modules/vm_ubuntu_24"
+  source = "../modules/quick_vm"
   name = "vt4_dhcp_bridge_a"
   vm_profile = local.vm_profile
   user_data = local.user_data
@@ -93,7 +93,7 @@ module "vm4" {
 }
 
 module "vm5" {
-  source = "../modules/vm_ubuntu_24"
+  source = "../modules/quick_vm"
   name = "vt5_dhcp_local_b"
   user_data = local.user_data
   vm_profile = local.vm_profile
@@ -103,7 +103,7 @@ module "vm5" {
 }
 
 module "vm6" {
-  source = "../modules/vm_ubuntu_24"
+  source = "../modules/quick_vm"
   name = "vt6_dhcp_bridge_b"
   user_data = local.user_data
   vm_profile = local.vm_profile
