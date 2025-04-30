@@ -15,6 +15,6 @@ provider "libvirt" {
 }
 
 module "kvm-networks" {
-  source = "../../modules/quick-network"
+  source = "../../modules/quick-networks"
   networks = local.networks
 }
