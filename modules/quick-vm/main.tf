@@ -194,7 +194,7 @@ resource "libvirt_domain" "vm" {
   # ------------------------------------------------------------------------------------------
 
   # see: https://github.com/dmacvicar/terraform-provider-libvirt/blob/main/examples/v0.13/ubuntu/ubuntu-example.tf
-  # why we have double console (it is some bug in cloud init)
+  # why we have double console (it is some bug in examples init)
 
   cpu {
     mode = local.current_vm_profile.cpu.mode
