@@ -12,12 +12,12 @@ resource "local_file" "ssh_config" {
     "#--------------------------------------------------- ${local.set_name}",
 
     [
-      for vm in local.nodes : (
-        (vm.local_ip != null && vm.local_ip != "") || (vm.bridge_ip != null && vm.bridge_ip != "") ?
+      for node in local.nodes : (
+        (node.local_ip != null && node.local_ip != "") || (node.bridge_ip != null && node.bridge_ip != "") ?
         join("\n", compact([
-          vm.local_ip != null && vm.local_ip != "" ? trimspace(<<-EOT
-Host ${vm.name}
-  HostName ${vm.local_ip}
+          node.local_ip != null && node.local_ip != "" ? trimspace(<<-EOT
+Host ${local.set_name}-${node.name}
+  HostName ${node.local_ip}
   User devx
   IdentityFile ${local.identity_file}
   StrictHostKeyChecking no
@@ -26,9 +26,9 @@ Host ${vm.name}
 EOT
           ) : null,
 
-          vm.bridge_ip != null && vm.bridge_ip != "" ? trimspace(<<-EOT
-Host ${vm.name}-viabridge
-  HostName ${vm.bridge_ip}
+          node.bridge_ip != null && node.bridge_ip != "" ? trimspace(<<-EOT
+Host ${local.set_name}-${node.name}-viabridge
+  HostName ${node.bridge_ip}
   User devx
   IdentityFile ${local.identity_file}
   StrictHostKeyChecking no
