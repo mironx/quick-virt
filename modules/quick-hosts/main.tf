@@ -1,7 +1,7 @@
 locals {
   set_name  = var.set_name
   nodes     = var.nodes
-  file_name = var.file_name != null ? var.file_name : "${path.root}/hosts-${local.set_name}"
+  file_name = var.file_name != null ? var.file_name : "${path.root}/quick-hosts-${local.set_name}"
 }
 
 resource "local_file" "hosts_file" {
