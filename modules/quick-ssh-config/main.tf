@@ -2,7 +2,7 @@ locals {
   set_name      = var.set_name
   identity_file = var.identity_file != null ? var.identity_file : "~/.ssh/id_rsa"
   nodes         = var.nodes
-  file_name     = var.file_name != null ? var.file_name : "${path.module}/ssh_config_${local.set_name}"
+  file_name     = var.file_name != null ? var.file_name : "${path.root}/ssh_config_${local.set_name}"
 }
 
 resource "local_file" "ssh_config" {
