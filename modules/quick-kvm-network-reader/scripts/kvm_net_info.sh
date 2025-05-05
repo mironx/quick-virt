@@ -4,8 +4,6 @@ set -euo pipefail
 if [ $# -eq 1 ]; then
   NET_NAME="$1"
 else
-  # zczytaj stdin do jednej zmiennej
-  # read stdin to one variable
   JSON_INPUT=$(cat)
   if echo "$JSON_INPUT" | jq -e .kvm_network_name > /dev/null; then
     NET_NAME=$(echo "$JSON_INPUT" | jq -r .kvm_network_name)
@@ -38,12 +36,10 @@ fi
 NETWORK=$(ipcalc "$CIDR" | grep -w "Network" | awk '{print $2}' | cut -d/ -f1)
 NETMASK=$(ipcalc "$CIDR" | grep -w "Netmask" | awk '{print $2}')
 
-
 # Return data as JSON (stdout)
 if [[ "$MODE" == "bridge" ]]; then
-  echo "{\"mode\": \"$MODE\", \"network\": \"$NETWORK\", \"prefix\": \"$PREFIX\", \"netmask\": \"$NETMASK\", \"gateway\": \"$GATEWAY\", \"bridge\": \"$BRIDGE\"}"
+  echo "{\"mode\": \"$MODE\", \"network\": \"$NETWORK\", \"mask_prefix\": \"$PREFIX\", \"mask_ip\": \"$NETMASK\", \"gateway\": \"$GATEWAY\", \"bridge\": \"$BRIDGE\"}"
 else
-  echo "{\"mode\": \"$MODE\", \"network\": \"$NETWORK\", \"prefix\": \"$PREFIX\", \"netmask\": \"$NETMASK\", \"gateway\": \"$GATEWAY\"}"
+  echo "{\"mode\": \"$MODE\", \"network\": \"$NETWORK\", \"mask_prefix\": \"$PREFIX\", \"mask_ip\": \"$NETMASK\", \"gateway\": \"$GATEWAY\"}"
 fi
-
 
