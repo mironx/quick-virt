@@ -16,10 +16,7 @@ output "kvm_networks_info" {
   value = {
     for net, mod in module.net_info :
     net => {
-      network = mod.network
-      gateway = mod.gateway
-      prefix  = mod.prefix
-      netmask = mod.netmask
+       all_for_debug = mod.all_for_debug
     }
   }
 }
@@ -29,7 +26,7 @@ output "kvm_networks_profile" {
   value = {
     for net, mod in module.net_info :
     net => {
-      network = mod.profile
+      profile = mod.profile
     }
   }
 }

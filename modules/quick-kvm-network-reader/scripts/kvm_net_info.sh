@@ -40,5 +40,10 @@ NETMASK=$(ipcalc "$CIDR" | grep -w "Netmask" | awk '{print $2}')
 
 
 # Return data as JSON (stdout)
-echo "{\"network\": \"$NETWORK\", \"prefix\": \"$PREFIX\", \"netmask\": \"$NETMASK\", \"gateway\": \"$GATEWAY\", \"bridge\": \"$BRIDGE\"}"
+if [[ "$MODE" == "bridge" ]]; then
+  echo "{\"mode\": \"$MODE\", \"network\": \"$NETWORK\", \"prefix\": \"$PREFIX\", \"netmask\": \"$NETMASK\", \"gateway\": \"$GATEWAY\", \"bridge\": \"$BRIDGE\"}"
+else
+  echo "{\"mode\": \"$MODE\", \"network\": \"$NETWORK\", \"prefix\": \"$PREFIX\", \"netmask\": \"$NETMASK\", \"gateway\": \"$GATEWAY\"}"
+fi
+
 

@@ -13,6 +13,11 @@ output "netmask" {
 output "gateway" {
   value = data.external.net_info.result.gateway
 }
+
+output "mode" {
+  value = data.external.net_info.result.mode
+}
+
 output "profile" {
   value = {
     kvm_network_name = var.kvm_network_name
@@ -21,6 +26,19 @@ output "profile" {
     gateway4         = data.external.net_info.result.gateway
     nameservers      = [data.external.net_info.result.gateway]
     bridge           = contains(keys(data.external.net_info.result), "bridge") ? data.external.net_info.result.bridge : null
+  }
+}
+
+output "all_for_debug" {
+  value = {
+    kvm_network_name = var.kvm_network_name
+    dhcp_mode        = "static"
+    mask             = data.external.net_info.result.netmask
+    gateway4         = data.external.net_info.result.gateway
+    nameservers      = [data.external.net_info.result.gateway]
+    bridge           = contains(keys(data.external.net_info.result), "bridge") ? data.external.net_info.result.bridge : null
+    mode             = data.external.net_info.result.mode
+    network         = data.external.net_info.result.network
   }
 }
 
