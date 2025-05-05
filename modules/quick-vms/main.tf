@@ -35,7 +35,7 @@ locals {
 
   user_data_map = {
     for set_key, set_val in var.machines :
-    set_key => templatefile("${path.module}/${set_val.cloud_unit_user_data}", {
+    set_key => templatefile("${path.root}/${set_val.cloud_unit_user_data}", {
       user_name     = set_val.user.name,
       user_password = set_val.user.password
     })
