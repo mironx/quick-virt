@@ -3,21 +3,6 @@
 **Quick-Virt** is a collection of Terraform modules and shell scripts designed to simplify the process of creating and managing KVM-based virtual machines (VMs) on Linux for development purposes.  
 The project was tested and run on **Ubuntu 24.04 LTS**.
 
----
-
-## Table of Contents
-
-- [License](#-license)
-- [Key Features](#-key-features)
-- [Core Module: `quick-vm`](#-core-module-quick-vm)
-- [Multi-VM Setup: `quick-vms`](#-multi-vm-setup-quick-vms)
-- [Modules Overview](#-modules-overview)
-- [Examples](#-examples)
-- [Setup Guide](#-setup-guide)
-- [Bridge Network Setup](#-bridge-network-setup)
-- [Utility Scripts](#-utility-scripts)
-- [External Links](#-external-links)
-
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
