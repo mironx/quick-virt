@@ -1,4 +1,9 @@
 #!/bin/bash
+#
+# Script Name: 02-disable-app-arrmor.sh
+#
+# Description: Disable app armor for libvirt
+#
 
 # check app armor status
 # sudo aa-status
