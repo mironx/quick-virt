@@ -64,7 +64,43 @@ The [`examples`](./examples) directory demonstrates how to use the modules:
 | [`example3b-vm`](./examples/example3b-vm) | Single VM with static IP |
 | [`example4-vms`](./examples/example4-vms) | Multiple VMs, with SSH and hosts config |
 
+## Scripts Overview
 
+The `scripts` directory includes helper and recovery tools that assist with environment setup and management:
+
+### Setup Scripts
+
+Located in [`scripts/setup`](./scripts/setup):
+
+| Script | Description |
+|--------|-------------|
+| [`01-install-kvm.sh`](./scripts/setup/01-install-kvm.sh) | Installs KVM, libvirt, and related packages required for virtualization |
+| [`02-disaple-app-arrmor`](./scripts/setup/02-disaple-app-arrmor) | Disables AppArmor to avoid interference with libvirt (use with caution) |
+
+---
+
+### Linux Bridge Scripts
+
+Located in [`scripts/linux-bridge`](./scripts/linux-bridge):
+
+| Script | Description |
+|--------|-------------|
+| [`create-bridge.sh`](./scripts/linux-bridge/create-bridge.sh) | Creates a Linux network bridge to use with VMs in bridged mode |
+| [`restore-network.sh`](./scripts/linux-bridge/restore-network.sh) | Restores original system networking by removing the bridge |
+
+---
+
+### Utility Tools
+
+Located in [`scripts/tools`](./scripts/tools):
+
+| Script | Description |
+|--------|-------------|
+| [`clean-all-vms.sh`](./scripts/tools/clean-all-vms.sh) | Removes all VMs manually (for broken or unrecoverable Terraform state) |
+| [`clean-kvm-network.sh`](./scripts/tools/clean-kvm-network.sh) | Removes KVM-defined networks forcefully |
+| [`get-iso-ubuntu22.sh`](./scripts/tools/get-iso-ubuntu22.sh) | Downloads Ubuntu 22.04 ISO for use with VMs |
+
+These scripts are helpful during development and troubleshooting when Terraform state becomes inconsistent or broken.
 
 ## External Links
 KVM: https://www.linux-kvm.org
