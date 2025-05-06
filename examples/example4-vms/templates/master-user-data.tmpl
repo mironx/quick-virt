@@ -1,0 +1,19 @@
+#cloud-config
+hostname: HOST_NAME
+
+users:
+  - name: ${user_name}
+    groups: sudo
+    shell: /bin/bash
+    lock_passwd: false
+    ssh-authorized-keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDnAs+J7I/hC+Tv/HLN7IIR438DzlpUEpr2VRpAjkNPouHgE5NiMU3TerS0MKoaRdkWvCt0+4F05K6Xilb/+8QPmY+G8SKp9DvCh2cubGw6xn6+2HoUHXpWyeo1U/9zCxA87wEGS1Y1XAXrmzGQg94kp/6tcW6tGubSq7rWEByE2g4RlClhVJLd6q7wv4yq3mZ0XHKGNNJat6ritDMaC8BiN6hKDWbWSOXUiwf0ICY2a3gPz8zyhbi3e3GPP8d1LsVFY/l7Ycwo96SxPT+CYfc/Lpd+6D6L+v3kjUgyrXvJMlY0iiMt7KyArgjFIv+XhIeBmO4wI3qMo9L9B+tIo/suF/Tk3ZorGM6KKHCQNewrazQmn0cY/XAuFpka91yPLd2f0QlLnBcXcwlJRzz2HHMvkvW0558IoVJqTUUyfh1Oi7k6xBzYpPl7nSZRX5Pfb9xDidcXB0RRJ/XzhSOXLlkkj0zWDSP1pfvSYDmeuDSvw2zJuYpkgjL/kKZb4cuxFcS54tBiFHMY19ACgu1QDspdWbiKEtREN5jS0VM2E5u9uMF0QOLIBu8QuLX9Eu8DtQ8N4IQw7DTquox8WhT+hdK34FAXBPmQ4rOxFBZhWs8lr/LxNkxvlHY8aaFIo8HU92sU+UtvCXuKVm0mJ0yavYig2D0DZuG5r6GXmtXDudocHw== devx@fieldmade
+    plain_text_passwd: '${user_password}'
+
+packages:
+  - qemu-guest-agent
+  - nginx
+  - tilde
+
+runcmd:
+  - systemctl enable --now qemu-guest-agent

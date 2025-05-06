@@ -41,7 +41,38 @@ locals {
     })
   }
 }
-
+#--------------------- for debug only -------------------
+# locals {
+#   ma = merge([
+#     for set_key, set_val in var.machines :
+#     {
+#       for node in set_val.nodes :
+#       "${set_key}-${node.name}" => {
+#       set_key    = set_key
+#       set_name   = set_val.set_name
+#       vm_profile = set_val.vm_profile
+#       main_storage = set_val.main_storage
+#       user_data  = local.user_data_map[set_key]
+#       node       = node
+#
+#
+#     }
+#     }
+#   ]...)
+# }
+#
+# resource "null_resource" "debug" {
+#   triggers = {
+#     always_run = timestamp()
+#   }
+#   lifecycle {
+#     precondition {
+#       condition = local.machines == null
+#       error_message = "machines=${jsonencode(local.ma)}"
+#     }
+#   }
+# }
+#--------------------------------------------------------
 
 output "local-network-profile" {
   value = local.local_network_profile_static
@@ -62,8 +93,11 @@ module "vms" {
       set_key    = set_key
       set_name   = set_val.set_name
       vm_profile = set_val.vm_profile
+      main_storage = set_val.main_storage
       user_data  = local.user_data_map[set_key]
       node       = node
+
+
     }
     }
   ]...)
@@ -73,6 +107,7 @@ module "vms" {
   description = each.value.node.description
   user_data   = each.value.user_data
   vm_profile  = each.value.vm_profile
+  main_storage = each.value.main_storage
 
   local_network = (
 
@@ -107,12 +142,9 @@ module "quick-ssh-config-generator" {
     nodes = each.value.nodes
 }
 
-
 module "quick-hosts-generator" {
     for_each    = local.machines
     source = "../quick-hosts"
     set_name = each.value.set_name
     nodes = each.value.nodes
 }
-
-

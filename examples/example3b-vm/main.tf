@@ -52,6 +52,9 @@ module "vm1" {
   name = "vt1_static_local_network"
   user_data = local.user_data
   vm_profile = local.vm_profile
+  main_storage = {
+    size = 40
+  }
   local_network = {
     ip         = "192.168.100.16"
     profile = local.local_network_profile_static
