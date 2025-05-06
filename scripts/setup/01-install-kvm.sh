@@ -1,4 +1,12 @@
 #!/bin/bash
+#
+# Script Name: 01-install-kvm.sh
+#
+# Description:
+#   This script installs KVM (Kernel-based Virtual Machine) and related packages on a Debian-based system.
+#   It also checks if KVM is supported on the system and adds the current user to the necessary groups.
+#   Finally, it installs additional packages required for modules like quick-kvm-network-reader.
+
 
 
 sudo apt update
