@@ -5,7 +5,7 @@ The project was tested and run on **Ubuntu 24.04 LTS**.
 
 ---
 
-## 📚 Table of Contents
+## Table of Contents
 
 - [License](#-license)
 - [Key Features](#-key-features)
@@ -18,8 +18,7 @@ The project was tested and run on **Ubuntu 24.04 LTS**.
 - [Utility Scripts](#-utility-scripts)
 - [External Links](#-external-links)
 
----
-## 📝 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
 
@@ -30,7 +29,6 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fi
 - SSH and hosts file generation for easy access and connectivity.
 - Includes helper scripts for system setup and recovery.
 
----
 
 ## Core Module: `quick-vm`
 
@@ -41,7 +39,6 @@ The `quick-vm` module is the foundation of the project. It enables the creation 
 
 To extract information about available KVM networks (e.g., name, type, address), the module `quick-kvm-network-reader` can be used.
 
----
 
 ## Multi-VM Setup: `quick-vms`
 
@@ -51,9 +48,8 @@ The `quick-vms` module allows the creation of a **subset of nodes** based on a g
 - SSH configuration generation (`quick-ssh-config`)
 - Hosts file generation (`quick-hosts`)
 
-⚠Ensure your cloud-init configuration includes your **public SSH key** to enable passwordless access.
+Ensure your cloud-init configuration includes your **public SSH key** to enable passwordless access.
 
----
 
 ## Modules Overview
 
@@ -70,8 +66,6 @@ Each module is located in the [`modules`](./modules) directory:
 | [`quick-hosts`](./modules/quick-hosts) | Generate `hosts` entries for VMs |
 
 Each module contains a `variables.tf` describing input parameters and a `main.tf` with logic. Outputs are defined in `outputs.tf` (if applicable).
-
----
 
 ## Examples
 
