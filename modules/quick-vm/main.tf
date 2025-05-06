@@ -62,6 +62,7 @@ locals {
   }
 }
 
+
 # resource "null_resource" "debug_local_network" {
 #   triggers = {
 #     always_run = timestamp()
@@ -71,12 +72,11 @@ locals {
 #       condition = local.current_local_network == null
 #       //error_message = jsonencode(var.local_network)
 #       //error_message = jsonencode(local.current_local_network)
-#       error_message = "cpu.mode=${var.vm_profile.cpu.mode}"
+#       //error_message = "cpu.mode=${var.vm_profile.cpu.mode}"
+#       error_message = "size=${var.main_storage.size} ${var.name}"
 #     }
 #   }
 # }
-
-
 
 //-------------------------------------------------------------------------------
 locals {
@@ -125,12 +125,26 @@ locals {
 }
 //-------------------------------------------------------------------------------
 
+locals {
+  main_storage = var.main_storage != null ? {
+    size = coalesce(var.main_storage.size, 20)
+  } : {
+    size         = 20
+  }
+  main_storage_size = local.main_storage.size * 1024 * 1024 * 1024
+}
+
+resource "libvirt_volume" "vm-disk-reference" {
+  name   = "${var.name}-ref.qcow2"
+  source = local.current_vm_profile.image_source
+}
+
 resource "libvirt_volume" "vm-disk" {
   name   = "${var.name}.qcow2"
   pool   = local.storage_pool
-  source = local.current_vm_profile.image_source
   format = "qcow2"
-  depends_on = [null_resource.validate]
+  base_volume_id = libvirt_volume.vm-disk-reference.id
+  size   = local.main_storage_size
 }
 
 resource "libvirt_cloudinit_disk" "cloudinit" {

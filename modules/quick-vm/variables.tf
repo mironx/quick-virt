@@ -36,6 +36,15 @@ variable "user_data" {
     description = "User data for cloud-init"
 }
 
+variable "main_storage" {
+  description = "Configuration options for the VM's main disk"
+  type = object({
+    size = optional(number, 20)
+  })
+  default = null
+}
+
+
 variable "vm_profile" {
   type = object({
     image_source = optional(string)

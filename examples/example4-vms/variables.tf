@@ -4,22 +4,22 @@ variable "machines" {
     vm_profile = object({
       vcpu   = number
       memory = number
-      cpu = optional(object({
+      cpu    = optional(object({
         mode = optional(string)
       }))
     })
     main_storage = optional(object({
-        size = optional(number, 20)
-      }))
+      size = optional(number, 20)
+    }))
     user = object({
       name     = string
       password = string
     })
     cloud_unit_user_data = string
     nodes = list(object({
-      name = string
-      local_ip = optional(string)
-      bridge_ip = optional(string)
+      name        = string
+      local_ip    = optional(string)
+      bridge_ip   = optional(string)
       description = optional(string)
     }))
   }))
