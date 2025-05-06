@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# check app armor status
+# sudo aa-status
+# sudo aa-status | grep qemu
+
+
+# warning:
+# require reboot
+
+# This configuration is required for terraform provider libvirt
+# that uses qemu to create and manage virtual machines.
+
+# 1. set libvirt images directory to 751
+sudo chmod 751 /var/lib/libvirt/images
+
+# 2. deactivation
+sudo ln -s /etc/apparmor.d/libvirt-qemu /etc/apparmor.d/disable/
+sudo ln -s /etc/apparmor.d/libvirt/TEMPLATE.qemu /etc/apparmor.d/disable/ 2>/dev/null || true
+
+# 3. load and remove
+sudo apparmor_parser -R /etc/apparmor.d/libvirt-qemu
+sudo apparmor_parser -R /etc/apparmor.d/libvirt/TEMPLATE.qemu 2>/dev/null || true
+
+
+# 4. Install other packages for terraform modules like: quick-kvm-network-reader

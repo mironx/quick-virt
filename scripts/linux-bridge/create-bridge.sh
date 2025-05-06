@@ -1,4 +1,35 @@
 #!/bin/bash
+#
+# Description:
+#   This script creates a network bridge on a Linux system using NetworkManager's `nmcli` command-line tool.
+#   It sets up a new bridge interface and attaches a specified physical interface to it as a slave.
+#   The bridge is configured to use the MAC address of the physical interface and is set to obtain
+#   its IPv4 address via DHCP while disabling IPv6.
+#
+# Parameters:
+#   --phys-if <physical_interface>   The name of the physical network interface (e.g., enp0s31f6).
+#   --bridge-name <bridge_name>      The desired name for the new bridge interface (e.g., br0).
+#
+# Requirements:
+#   - NetworkManager and nmcli must be installed and running.
+#   - The script must be executed with sufficient privileges (e.g., as root or via sudo).
+#
+# Example Usage:
+#   ./create-bridge.sh --phys-if enp0s31f6 --bridge-name br0
+#   ./create-bridge.sh --phys-if enp0s25 --bridge-name br0
+#
+# Behavior:
+#   1. Validates the existence of the specified physical interface.
+#   2. Reads the MAC address from the physical interface.
+#   3. Creates a bridge connection using nmcli.
+#   4. Sets the bridge's MAC address to match the physical interface.
+#   5. Adds the physical interface to the bridge as a slave.
+#   6. Configures the bridge to obtain an IP address via DHCP (IPv4 only).
+#   7. Brings the bridge interface up.
+#
+# Note:
+#   This script modifies network settings and may disrupt existing network connections during execution.
+#
 
 usage() {
   echo "Usage: $0 --phys-if <physical_interface> --bridge-name <bridge_name>"
