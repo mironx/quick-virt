@@ -35,10 +35,18 @@ locals {
 
   user_data_map = {
     for set_key, set_val in var.machines :
-    set_key => templatefile("${path.root}/${set_val.cloud_unit_user_data}", {
+    set_key => (
+      set_val.cloud_init_user_data_template != null
+      ? set_val.cloud_init_user_data_template
+      : (
+      set_val.cloud_init_user_data_path != null
+      ? templatefile("${path.root}/${set_val.cloud_init_user_data_path}", {
       user_name     = set_val.user.name,
       user_password = set_val.user.password
     })
+      : error("Both cloud_init_user_data_template and cloud_init_user_data_path are null for set '${set_key}'")
+    )
+    )
   }
 }
 #--------------------- for debug only -------------------

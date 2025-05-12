@@ -14,7 +14,7 @@ machines = {
       name     = "ubuntu"
       password = "ubuntu123"
     }
-    cloud_unit_user_data = "./templates/master-user-data.tmpl"
+    cloud_init_user_data_path = "./templates/master-user-data.tmpl"
     nodes = [
       {
         name        = "v1"
@@ -49,7 +49,7 @@ machines = {
       name     = "ubuntu"
       password = "ubuntu123"
     }
-    cloud_unit_user_data = "./templates/worker-user-data.tmpl"
+    cloud_init_user_data_path = "./templates/worker-user-data.tmpl"
     nodes = [
       {
         name        = "v1"
