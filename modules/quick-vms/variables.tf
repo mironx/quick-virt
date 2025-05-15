@@ -15,7 +15,9 @@ variable "machines" {
       name     = string
       password = string
     })
-    cloud_unit_user_data = string
+    cloud_init_user_data_path = optional(string)
+    cloud_init_user_data_template = optional(string)
+
     nodes = list(object({
       name = string
       local_ip = optional(string)
