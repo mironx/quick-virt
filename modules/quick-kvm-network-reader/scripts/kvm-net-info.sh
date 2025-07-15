@@ -53,6 +53,7 @@ set -euo pipefail
 
 if [ $# -eq 1 ]; then
   NET_NAME="$1"
+  echo "Using network name from argument: $NET_NAME"
 else
   JSON_INPUT=$(cat)
   if echo "$JSON_INPUT" | jq -e .kvm_network_name > /dev/null; then
@@ -61,6 +62,8 @@ else
     echo "Usage: $0 <kvm_network_name> OR pass JSON via stdin" >&2
     exit 1
   fi
+  echo "Json input: $JSON_INPUT"
+  echo "Using network name from JSON input: $NET_NAME"
 fi
 
 XML=$(virsh net-dumpxml "$NET_NAME")

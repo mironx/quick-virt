@@ -134,6 +134,13 @@ locals {
   main_storage_size = local.main_storage.size * 1024 * 1024 * 1024
 }
 
+# locals {
+#   share_enable = try(coalesce(var.share.enable, false), false)
+#   share_source = try(var.share.source, "")
+#   share_target = try(var.share.target, "")
+#   share_readonly = try(var.share.readonly, false)
+# }
+
 resource "libvirt_volume" "vm-disk-reference" {
   name   = "${var.name}-ref.qcow2"
   source = local.current_vm_profile.image_source
@@ -206,6 +213,14 @@ resource "libvirt_domain" "vm" {
     }
   }
   # ------------------------------------------------------------------------------------------
+  # dynamic "filesystem" {
+  #   for_each = local.share_enable ? [1] : []
+  #   content {
+  #     source   = local.share_source
+  #     target   = local.share_target
+  #     readonly = local.share_readonly
+  #   }
+  # }
 
   # see: https://github.com/dmacvicar/terraform-provider-libvirt/blob/main/examples/v0.13/ubuntu/ubuntu-example.tf
   # why we have double console (it is some bug in examples init)

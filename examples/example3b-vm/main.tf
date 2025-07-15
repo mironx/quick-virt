@@ -59,12 +59,12 @@ module "vm1" {
     ip         = "192.168.100.16"
     profile = local.local_network_profile_static
   }
-  bridge_network = {
-    ip         = "172.16.0.16"
-    profile = local.bridge_network_profile_static
-  }
+  # bridge_network = {
+  #   ip         = "172.16.0.16"
+  #   profile = local.bridge_network_profile_static
+  # }
 }
-
+/*
 module "vm2" {
   source = "../../modules/quick-vm"
   name = "vt2_dhcp_local_network"
@@ -73,9 +73,9 @@ module "vm2" {
   local_network = {
     profile = local.local_network_profile_dhcp
   }
-  bridge_network = {
-    profile = local.bridge_network_profile_dhcp
-  }
+  # bridge_network = {
+  #   profile = local.bridge_network_profile_dhcp
+  # }
 }
 
 module "vm3" {
@@ -86,9 +86,9 @@ module "vm3" {
   local_network = {
     profile = local.local_network_profile_dhcp
   }
-  bridge_network = {
-    is_enabled = false
-  }
+  # bridge_network = {
+  #   is_enabled = false
+  # }
 }
 
 module "vm4" {
@@ -99,9 +99,9 @@ module "vm4" {
   local_network = {
     is_enabled = false
   }
-  bridge_network = {
-    profile = local.bridge_network_profile_dhcp
-  }
+  # bridge_network = {
+  #   profile = local.bridge_network_profile_dhcp
+  # }
 }
 
 module "vm5" {
@@ -114,12 +114,12 @@ module "vm5" {
   }
 }
 
-module "vm6" {
-  source = "../../modules/quick-vm"
-  name = "vt6_dhcp_bridge_b"
-  user_data = local.user_data
-  vm_profile = local.vm_profile
-  bridge_network = {
-    profile = local.bridge_network_profile_dhcp
-  }
-}
+# module "vm6" {
+#   source = "../../modules/quick-vm"
+#   name = "vt6_dhcp_bridge_b"
+#   user_data = local.user_data
+#   vm_profile = local.vm_profile
+#   bridge_network = {
+#     profile = local.bridge_network_profile_dhcp
+#   }
+# }*/
