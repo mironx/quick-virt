@@ -94,3 +94,19 @@ variable "bridge_network" {
     is_enabled = false
   }
 }
+
+# variable "share" {
+#   description = "Optional share configuration"
+#   type = object({
+#     enable = optional(bool, false)
+#     source = optional(string)
+#     target = optional(string)
+#     readonly = optional(bool, false)
+#   })
+#   default = {
+#     enable = false
+#     source = null
+#     target = null
+#     readonly = false
+#   }
+# }
