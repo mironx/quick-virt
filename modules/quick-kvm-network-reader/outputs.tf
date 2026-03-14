@@ -27,6 +27,7 @@ output "profile" {
     nameservers      = [data.external.net_info.result.gateway]
     bridge           = data.external.net_info.result.mode == "bridge" ? data.external.net_info.result.bridge : null
     mode             = data.external.net_info.result.mode
+    error            = data.external.net_info.result.error
   }
 }
 
@@ -41,5 +42,6 @@ output "all_for_debug" {
     bridge           = data.external.net_info.result.mode == "bridge" ? data.external.net_info.result.bridge : null
     mode             = data.external.net_info.result.mode
     network          = data.external.net_info.result.network
+    error            = data.external.net_info.result.error
   }
 }

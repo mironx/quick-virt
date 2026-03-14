@@ -118,14 +118,13 @@ module "vms" {
   main_storage = each.value.main_storage
 
   local_network = (
-
     each.value.node.local_ip != null && local.local_network_profile_static != null ? {
     is_enabled = true
-    ip      = each.value.node.local_ip
-    profile = local.local_network_profile_static
+    ip         = each.value.node.local_ip
+    profile    = local.local_network_profile_static
   } : {
     is_enabled = false
-    ip        = null
+    ip         = null
     profile    = null
   }
   )
@@ -133,11 +132,11 @@ module "vms" {
   bridge_network = (
     each.value.node.bridge_ip != null && local.bridge_network_profile_static != null ? {
     is_enabled = true
-    ip      = each.value.node.bridge_ip
-    profile = local.bridge_network_profile_static
+    ip         = each.value.node.bridge_ip
+    profile    = local.bridge_network_profile_static
   } : {
     is_enabled = false
-    ip        = null
+    ip         = null
     profile    = null
   }
   )

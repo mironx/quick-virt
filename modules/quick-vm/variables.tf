@@ -67,6 +67,7 @@ variable "local_network" {
       mask      = optional(string)
       gateway4  = optional(string)
       nameservers = optional(list(string))
+      error = optional(string, "")
     }))
   })
   default = {
@@ -87,6 +88,7 @@ variable "bridge_network" {
       gateway4  = optional(string)
       nameservers = optional(list(string))
       bridge = string
+      error = optional(string, "")
     }))
   })
   default = {
