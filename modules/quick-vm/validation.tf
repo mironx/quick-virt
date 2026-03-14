@@ -31,8 +31,8 @@ resource "null_resource" "validate_vm" {
 resource "null_resource" "validate_local_network" {
   lifecycle {
     precondition {
-      condition     = !(local.current_local_network.is_enabled && try(var.local_network.profile.error, "") != "")
-      error_message = "VM '${var.name}' wants to use local network '${try(var.local_network.profile.kvm_network_name, "unknown")}', but there is a problem with this network: ${try(var.local_network.profile.error, "")}"
+      condition     = !(local.current_local_network.is_enabled && try(local.resolved_local_network_profile.error, "") != "")
+      error_message = "VM '${var.name}' wants to use local network '${try(local.resolved_local_network_profile.kvm_network_name, "unknown")}', but there is a problem with this network: ${try(local.resolved_local_network_profile.error, "")}"
     }
 
     precondition {
@@ -60,8 +60,8 @@ resource "null_resource" "validate_local_network" {
 resource "null_resource" "validate_bridge_network" {
   lifecycle {
     precondition {
-      condition     = !(local.current_bridge_network.is_enabled && try(var.bridge_network.profile.error, "") != "")
-      error_message = "VM '${var.name}' wants to use bridge network '${try(var.bridge_network.profile.kvm_network_name, "unknown")}', but there is a problem with this network: ${try(var.bridge_network.profile.error, "")}"
+      condition     = !(local.current_bridge_network.is_enabled && try(local.resolved_bridge_network_profile.error, "") != "")
+      error_message = "VM '${var.name}' wants to use bridge network '${try(local.resolved_bridge_network_profile.kvm_network_name, "unknown")}', but there is a problem with this network: ${try(local.resolved_bridge_network_profile.error, "")}"
     }
 
     precondition {

@@ -139,3 +139,20 @@ module "vm6" {
     profile    = local.bridge_network_profile_dhcp
   }
 }
+
+module "vm7" {
+  source = "../../modules/quick-vm"
+  name = "vt7_profile_name"
+  user_data = local.user_data
+  vm_profile = local.vm_profile
+  local_network = {
+    is_enabled   = local.use_network_local
+    ip           = "192.168.100.20"
+    profile_name = "neta-loc-1"
+  }
+  bridge_network = {
+    is_enabled   = local.use_network_bridge
+    ip           = "172.16.0.20"
+    profile_name = "net-bridge"
+  }
+}
