@@ -11,7 +11,7 @@ provider "libvirt" {
 }
 
 locals {
-  use_network_local  = true
+  use_network_local  = false
   use_network_bridge = true
 }
 

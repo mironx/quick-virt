@@ -2,7 +2,7 @@ terraform {
   required_providers {
     libvirt = {
       source  = "dmacvicar/libvirt"
-      version = "~> 0.8.0"
+      version = "~> 0.9.0"
     }
     null = {
       source  = "hashicorp/null"
@@ -137,8 +137,8 @@ locals {
   bridge_dhcp = local.current_bridge_network.is_enabled && local.current_bridge_network.profile.dhcp_mode == "dhcp"
 
 
-  interface_network1 = "ens3"
-  interface_network2 = local.current_local_network.is_enabled ? "ens4" : "ens3"
+  interface_network1 = "enp0s3"
+  interface_network2 = local.current_local_network.is_enabled ? "enp0s4" : "enp0s3"
 
   network_config = templatefile("${path.module}/templates/network-config.tmpl", {
     interface_network1        = local.interface_network1
@@ -188,112 +188,188 @@ locals {
 }
 
 resource "libvirt_volume" "vm-disk-reference" {
-  name   = "${var.name}-ref.qcow2"
-  source = local.current_vm_profile.image_source
+  name = "${var.name}-ref.qcow2"
+  pool = local.storage_pool
+  create = {
+    content = {
+      url = local.current_vm_profile.image_source
+    }
+  }
+  target = {
+    format = {
+      type = "qcow2"
+    }
+  }
 }
 
 resource "libvirt_volume" "vm-disk" {
-  name   = "${var.name}.qcow2"
-  pool   = local.storage_pool
-  format = "qcow2"
-  base_volume_id = libvirt_volume.vm-disk-reference.id
-  size   = local.main_storage_size
+  name     = "${var.name}.qcow2"
+  pool     = local.storage_pool
+  capacity = local.main_storage_size
+
+  backing_store = {
+    path = libvirt_volume.vm-disk-reference.path
+    format = {
+      type = "qcow2"
+    }
+  }
+
+  target = {
+    format = {
+      type = "qcow2"
+    }
+  }
 }
 
 resource "libvirt_cloudinit_disk" "cloudinit" {
-  name           = "${var.name}_cloudinit.iso"
+  name           = "${var.name}_cloudinit"
   network_config = local.network_config
   user_data      = local.user_data
   meta_data      = local.meta_data
-  pool           = local.storage_pool
   depends_on     = [null_resource.validate]
+}
+
+resource "libvirt_volume" "cloudinit" {
+  name = "${var.name}_cloudinit.iso"
+  pool = local.storage_pool
+  create = {
+    content = {
+      url = libvirt_cloudinit_disk.cloudinit.path
+    }
+  }
+  target = {
+    format = {
+      type = "iso"
+    }
+  }
+}
+
+locals {
+  # Build ordered list of network interfaces
+  _local_interface = local.current_local_network.is_enabled ? [{
+    source = {
+      network = {
+        network = local.current_local_network.profile.kvm_network_name
+      }
+    }
+    model = {
+      type = "virtio"
+    }
+  }] : []
+
+  _bridge_interface = local.current_bridge_network.is_enabled ? [{
+    source = {
+      bridge = {
+        bridge = local.current_bridge_network.profile.bridge
+      }
+    }
+    model = {
+      type = "virtio"
+    }
+  }] : []
+
 }
 
 resource "libvirt_domain" "vm" {
   name   = var.name
-  memory = local.current_vm_profile.memory
-  vcpu   = local.current_vm_profile.vcpu
+  type   = "kvm"
+  memory      = local.current_vm_profile.memory
+  memory_unit = "MiB"
+  vcpu        = local.current_vm_profile.vcpu
 
-  disk {
-    volume_id = libvirt_volume.vm-disk.id
+  os = {
+    type = "hvm"
+    boot = [{
+      dev = "hd"
+    }]
   }
 
-  cloudinit = libvirt_cloudinit_disk.cloudinit.id
-
-  # ------------------------------------------------------------------------------------------
-  # Network interfaces are ordered differently based on network_desc_order variable
-  # If network_desc_order is false, local network interface is first
-  # If network_desc_order is true, bridge network interface is first
-  dynamic "network_interface" {
-    for_each = !local.current_vm_profile.network_desc_order && local.current_local_network.is_enabled ? [1] : []
-    content {
-      network_name = local.current_local_network.profile.kvm_network_name
-    }
-  }
-
-  dynamic "network_interface" {
-    for_each = !local.current_vm_profile.network_desc_order && local.current_bridge_network.is_enabled ? [1] : []
-    content {
-      network_name = local.current_bridge_network.profile.kvm_network_name
-      bridge       = local.current_bridge_network.profile.bridge
-    }
-  }
-  # ------------------------------------------------------------------------------------------
-
-  # ------------------------------------------------------------------------------------------
-  # Reversed order when network_desc_order is true
-  # If network_desc_order is true, bridge network interface is first
-  # If network_desc_order is false, local network interface is first
-  dynamic "network_interface" {
-    for_each = local.current_vm_profile.network_desc_order && local.current_bridge_network.is_enabled ? [1] : []
-    content {
-      network_name = local.bridge_network_name
-      bridge       = local.current_bridge_network.profile.bridge
-    }
-  }
-
-  dynamic "network_interface" {
-    for_each = local.current_vm_profile.network_desc_order && local.current_local_network.is_enabled ? [1] : []
-    content {
-      network_name = local.local_network_name
-    }
-  }
-  # ------------------------------------------------------------------------------------------
-
-  # see: https://github.com/dmacvicar/terraform-provider-libvirt/blob/main/examples/v0.13/ubuntu/ubuntu-example.tf
-  # why we have double console (it is some bug in examples init)
-
-  cpu {
+  cpu = {
     mode = local.current_vm_profile.cpu.mode
   }
 
-  console {
-    type        = "pty"
-    target_port = "0"
-    target_type = "serial"
+  devices = {
+    disks = [
+      {
+        source = {
+          volume = {
+            pool   = local.storage_pool
+            volume = libvirt_volume.vm-disk.name
+          }
+        }
+        target = {
+          dev = "vda"
+          bus = "virtio"
+        }
+        driver = {
+          name = "qemu"
+          type = "qcow2"
+        }
+      },
+      {
+        source = {
+          volume = {
+            pool   = local.storage_pool
+            volume = libvirt_volume.cloudinit.name
+          }
+        }
+        target = {
+          dev = "sda"
+          bus = "sata"
+        }
+        device   = "cdrom"
+        read_only = true
+      }
+    ]
+
+    interfaces = local.current_vm_profile.network_desc_order ? concat(
+      [for i in local._bridge_interface : i],
+      [for i in local._local_interface : i]
+    ) : concat(
+      [for i in local._local_interface : i],
+      [for i in local._bridge_interface : i]
+    )
+
+    consoles = [
+      {
+        target = {
+          type = "serial"
+          port = 0
+        }
+      },
+      {
+        target = {
+          type = "virtio"
+          port = 1
+        }
+      }
+    ]
+
+    graphics = [
+      {
+        spice = {
+          auto_port = true
+        }
+      }
+    ]
+
+    channels = local.enable_guest_agent ? [
+      {
+        target = {
+          virt_io = {
+            name = "org.qemu.guest_agent.0"
+          }
+        }
+      }
+    ] : []
   }
 
-  console {
-    type        = "pty"
-    target_type = "virtio"
-    target_port = "1"
-  }
-
-  graphics {
-    type        = "spice"
-    listen_type = "address"
-    autoport    = true
-  }
-
-  running = local.running
-  autostart = local.autostart
+  running     = local.running
+  autostart   = local.autostart
   description = local.description
-
-
-  qemu_agent = local.enable_guest_agent
 
   depends_on = [
     libvirt_volume.vm-disk,
-    libvirt_cloudinit_disk.cloudinit,
+    libvirt_volume.cloudinit,
   ]
 }
