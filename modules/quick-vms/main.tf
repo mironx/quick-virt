@@ -1,7 +1,8 @@
 terraform {
   required_providers {
     libvirt = {
-      source = "dmacvicar/libvirt"
+      source  = "dmacvicar/libvirt"
+      version = "~> 0.8.0"
     }
   }
 }
@@ -44,7 +45,7 @@ locals {
       user_name     = set_val.user.name,
       user_password = set_val.user.password
     })
-      : error("Both cloud_init_user_data_template and cloud_init_user_data_path are null for set '${set_key}'")
+      : file("ERROR: Both cloud_init_user_data_template and cloud_init_user_data_path are null for set '${set_key}'")
     )
     )
   }
@@ -118,14 +119,13 @@ module "vms" {
   main_storage = each.value.main_storage
 
   local_network = (
-
     each.value.node.local_ip != null && local.local_network_profile_static != null ? {
     is_enabled = true
-    ip      = each.value.node.local_ip
-    profile = local.local_network_profile_static
+    ip         = each.value.node.local_ip
+    profile    = local.local_network_profile_static
   } : {
     is_enabled = false
-    ip        = null
+    ip         = null
     profile    = null
   }
   )
@@ -133,11 +133,11 @@ module "vms" {
   bridge_network = (
     each.value.node.bridge_ip != null && local.bridge_network_profile_static != null ? {
     is_enabled = true
-    ip      = each.value.node.bridge_ip
-    profile = local.bridge_network_profile_static
+    ip         = each.value.node.bridge_ip
+    profile    = local.bridge_network_profile_static
   } : {
     is_enabled = false
-    ip        = null
+    ip         = null
     profile    = null
   }
   )

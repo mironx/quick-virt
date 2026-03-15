@@ -1,0 +1,59 @@
+version: '3'
+
+vars:
+  SCRIPTS_DIR: ./scripts
+
+tasks:
+  # ---------------------------------------------------------------------------
+  # Setup
+  # ---------------------------------------------------------------------------
+  setup:install-kvm:
+    desc: Install KVM, libvirt, and related packages
+    cmd: sudo {{.SCRIPTS_DIR}}/setup/install-kvm.sh
+
+  # ---------------------------------------------------------------------------
+  # Linux Bridge
+  # ---------------------------------------------------------------------------
+  bridge:status:
+    desc: Show status and recommendations for all bridges (or specify BRIDGE=br0)
+    cmd: '{{.SCRIPTS_DIR}}/linux-bridge/show-bridge-status.sh {{.BRIDGE | default ""}}'
+    vars:
+      BRIDGE: '{{.BRIDGE}}'
+
+  bridge:create:
+    desc: Create a network bridge (requires PHYS_IF and BRIDGE_NAME)
+    cmd: sudo {{.SCRIPTS_DIR}}/linux-bridge/create-bridge.sh --phys-if {{.PHYS_IF}} --bridge-name {{.BRIDGE_NAME}}
+    requires:
+      vars: [PHYS_IF, BRIDGE_NAME]
+
+  bridge:restore:
+    desc: Restore network after bridge removal
+    cmd: sudo {{.SCRIPTS_DIR}}/linux-bridge/restore-network.sh
+
+  # ---------------------------------------------------------------------------
+  # Tools
+  # ---------------------------------------------------------------------------
+  tools:clean-vms:
+    desc: Remove all VMs (destroy and undefine)
+    cmd: sudo {{.SCRIPTS_DIR}}/tools/clean-all-vms.sh
+
+  tools:clean-networks:
+    desc: Remove all KVM networks
+    cmd: sudo {{.SCRIPTS_DIR}}/tools/clean-kvm-network.sh
+
+  tools:get-ubuntu22:
+    desc: Download Ubuntu 22.04 cloud image
+    cmd: sudo {{.SCRIPTS_DIR}}/tools/get-iso-ubuntu22.sh
+
+  # ---------------------------------------------------------------------------
+  # KVM Network Reader
+  # ---------------------------------------------------------------------------
+  net:info:
+    desc: Show network info for a KVM network (requires NET=<name>)
+    cmd: '{{.SCRIPTS_DIR}}/../modules/quick-kvm-network-reader/scripts/kvm-net-info.sh {{.NET}}'
+    requires:
+      vars: [NET]
+
+  net:test:
+    desc: Run tests for kvm-net-info.sh
+    cmd: ./modules/quick-kvm-network-reader/scripts/test-kvm-net-info.sh

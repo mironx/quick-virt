@@ -1,6 +1,6 @@
 # Quick-Virt
 
-**Quick-Virt** is a collection of Terraform modules and shell scripts designed to simplify the process of creating and managing KVM-based virtual machines (VMs) on Linux for development purposes.  
+**Quick-Virt** is a collection of Terraform modules and shell scripts designed to simplify the process of creating and managing KVM-based virtual machines (VMs) on Linux for development purposes.
 The project was tested and run on **Ubuntu 24.04 LTS**.
 
 ## License
@@ -12,8 +12,43 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fi
 - Rapid creation of KVM networks and VMs using Terraform.
 - Modular structure to support single VM or multiple node cluster provisioning.
 - SSH and hosts file generation for easy access and connectivity.
+- Graceful network error handling with actionable validation messages.
+- Task runner (`Taskfile`) for common operations.
 - Includes helper scripts for system setup and recovery.
 
+## Prerequisites
+
+### Install Task (Task Runner)
+
+[Task](https://taskfile.dev) is used to run common operations. Install it:
+
+```bash
+# Linux (recommended)
+sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
+
+# Or via Go
+go install github.com/go-task/task/v3/cmd/task@latest
+
+# Or via package manager (Ubuntu/Debian)
+sudo snap install task --classic
+```
+
+After installation, run `task --list` from the project root to see available commands.
+
+### Available Tasks
+
+```bash
+task setup:install-kvm                                  # Install KVM and libvirt
+task bridge:status                                      # Show all bridges status
+task bridge:status BRIDGE=br0                           # Show specific bridge
+task bridge:create PHYS_IF=enp0s31f6 BRIDGE_NAME=br0    # Create a bridge
+task bridge:restore                                     # Restore network after bridge removal
+task tools:clean-vms                                    # Remove all VMs
+task tools:clean-networks                               # Remove all KVM networks
+task tools:get-ubuntu22                                  # Download Ubuntu 22.04 image
+task net:info NET=neta-loc-1                             # Show network info
+task net:test                                            # Run network reader tests
+```
 
 ## Core Module: `quick-vm`
 
@@ -21,20 +56,19 @@ The `quick-vm` module is the foundation of the project. It enables the creation 
 
 - **Local interface** with **DHCP** or **static IP** support
 - **Bridge interface** with **DHCP** or **static IP** support
+- Network profile via `profile` (object) or `profile_name` (string — auto-reads from libvirt)
 
 To extract information about available KVM networks (e.g., name, type, address), the module `quick-kvm-network-reader` can be used.
 
-
 ## Multi-VM Setup: `quick-vms`
 
-The `quick-vms` module allows the creation of a **subset of nodes** based on a given configuration file. It automates:
+The `quick-vms` module allows the creation of a **subset of nodes** based on a given configuration. It automates:
 
 - Provisioning of multiple VMs
 - SSH configuration generation (`quick-ssh-config`)
 - Hosts file generation (`quick-hosts`)
 
 Ensure your cloud-init configuration includes your **public SSH key** to enable passwordless access.
-
 
 ## Modules Overview
 
@@ -60,51 +94,17 @@ The [`examples`](./examples) directory demonstrates how to use the modules:
 |---------|-------------|
 | [`example1-network`](./examples/example1-network) | Create a KVM network |
 | [`example2-kvm-network-reader`](./examples/example2-kvm-network-reader) | Read and display network parameters |
-| [`example3a-vm`](./examples/example3a-vm) | Single VM creation with DHCP |
-| [`example3b-vm`](./examples/example3b-vm) | Single VM with static IP |
+| [`example3a-vm`](./examples/example3a-vm) | Single VM creation with network profile via reader |
+| [`example3b-vm`](./examples/example3b-vm) | Single VM with static IP and profile_name |
 | [`example4-vms`](./examples/example4-vms) | Multiple VMs, with SSH and hosts config |
 
-## Scripts Overview
+## Documentation
 
-The `scripts` directory includes helper and recovery tools that assist with environment setup and management:
-
-### Setup Scripts
-
-Located in [`scripts/setup`](./scripts/setup):
-
-| Script | Description |
-|--------|-------------|
-| [`01-install-kvm.sh`](./scripts/setup/01-install-kvm.sh) | Installs KVM, libvirt, and related packages required for virtualization |
-| [`02-disaple-app-arrmor`](./scripts/setup/02-disaple-app-arrmor) | Disables AppArmor to avoid interference with libvirt (use with caution) |
-
----
-
-### Linux Bridge Scripts
-
-Located in [`scripts/linux-bridge`](./scripts/linux-bridge):
-
-| Script | Description |
-|--------|-------------|
-| [`create-bridge.sh`](./scripts/linux-bridge/create-bridge.sh) | Creates a Linux network bridge to use with VMs in bridged mode |
-| [`restore-network.sh`](./scripts/linux-bridge/restore-network.sh) | Restores original system networking by removing the bridge |
-
----
-
-### Utility Tools
-
-Located in [`scripts/tools`](./scripts/tools):
-
-| Script | Description |
-|--------|-------------|
-| [`clean-all-vms.sh`](./scripts/tools/clean-all-vms.sh) | Removes all VMs manually (for broken or unrecoverable Terraform state) |
-| [`clean-kvm-network.sh`](./scripts/tools/clean-kvm-network.sh) | Removes KVM-defined networks forcefully |
-| [`get-iso-ubuntu22.sh`](./scripts/tools/get-iso-ubuntu22.sh) | Downloads Ubuntu 22.04 ISO for use with VMs |
-
-These scripts are helpful during development and troubleshooting when Terraform state becomes inconsistent or broken.
+Detailed project structure, module descriptions, and script documentation: [`doc/STRUCTURE.md`](./doc/STRUCTURE.md)
 
 ## External Links
-KVM: https://www.linux-kvm.org
 
-Terraform Libvirt Provider: https://github.com/dmacvicar/terraform-provider-libvirt
-
-Cloud-Init: https://cloudinit.readthedocs.io/en/latest/
+- KVM: https://www.linux-kvm.org
+- Terraform Libvirt Provider: https://github.com/dmacvicar/terraform-provider-libvirt
+- Cloud-Init: https://cloudinit.readthedocs.io/en/latest/
+- Task Runner: https://taskfile.dev

@@ -1,5 +1,5 @@
 terraform {
- required_providers {
+  required_providers {
     libvirt = {
       source = "dmacvicar/libvirt"
     }
@@ -10,29 +10,94 @@ provider "libvirt" {
   uri = "qemu:///system"
 }
 
-# resource "null_resource" "debug" {
-#   triggers = {
-#     always_run = timestamp()
-#   }
-#   lifecycle {
-#     precondition {
-#       condition = local.machines == null
-#       error_message = "machines=${jsonencode(var.machines)}"
-#     }
-#   }
-# }
-
 locals {
-  machines = var.machines
-  local-kvm-network-name = var.local-kvm-network-name
-  bridge-kvm-network-name = var.bridge-kvm-network-name
+  use_network_local  = true
+  use_network_bridge = true
 }
 
 module "vms" {
-  source      = "../../modules/quick-vms"
-  machines    = local.machines
-  local-kvm-network-name = local.local-kvm-network-name
-  bridge-kvm-network-name = local.bridge-kvm-network-name
+  source                  = "../../modules/quick-vms"
+  local-kvm-network-name  = local.use_network_local ? "qvexample-neta-loc-2" : null
+  bridge-kvm-network-name = local.use_network_bridge ? "qvexample-net-bridge" : null
+
+  machines = {
+    masters = {
+      set_name = "black-master"
+      vm_profile = {
+        vcpu   = 1
+        memory = 2048
+      }
+      main_storage = {
+        size = 30
+      }
+      user = {
+        name     = "ubuntu"
+        password = "ubuntu123"
+      }
+      cloud_init_user_data_path = "./templates/master-user-data.tmpl"
+      nodes = [
+        {
+          name        = "v1"
+          local_ip    = "192.168.201.3"
+          bridge_ip   = "172.20.0.17"
+          description = "black virtual machine"
+        },
+        {
+          name        = "v2"
+          local_ip    = "192.168.201.4"
+          bridge_ip   = "172.20.0.18"
+          description = "black virtual machine"
+        },
+        {
+          name        = "v3"
+          local_ip    = "192.168.201.5"
+          bridge_ip   = "172.20.0.19"
+          description = "black virtual machine"
+        }
+      ]
+    }
+    workers = {
+      set_name = "black-worker"
+      vm_profile = {
+        vcpu   = 3
+        memory = 4048
+      }
+      main_storage = {
+        size = 40
+      }
+      user = {
+        name     = "ubuntu"
+        password = "ubuntu123"
+      }
+      cloud_init_user_data_path = "./templates/worker-user-data.tmpl"
+      nodes = [
+        {
+          name        = "v1"
+          local_ip    = "192.168.201.33"
+          bridge_ip   = "172.20.0.37"
+          description = "black virtual machine"
+        },
+        {
+          name        = "v2"
+          local_ip    = "192.168.201.34"
+          bridge_ip   = "172.20.0.38"
+          description = "black virtual machine"
+        },
+        {
+          name        = "v3"
+          local_ip    = "192.168.201.35"
+          bridge_ip   = "172.20.0.39"
+          description = "black virtual machine"
+        },
+        {
+          name        = "v4"
+          local_ip    = "192.168.201.36"
+          bridge_ip   = "172.20.0.40"
+          description = "black virtual machine"
+        }
+      ]
+    }
+  }
 }
 
 output "all_vms_info" {

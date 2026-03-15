@@ -1,13 +1,66 @@
 terraform {
   required_providers {
     libvirt = {
-      source = "dmacvicar/libvirt"
+      source  = "dmacvicar/libvirt"
+      version = "~> 0.8.0"
     }
     null = {
       source  = "hashicorp/null"
       version = "3.2.3"
     }
   }
+}
+
+module "local_network_profile_reader" {
+  count            = var.local_network.profile_name != null && coalesce(var.local_network.is_enabled, true) ? 1 : 0
+  source           = "../quick-kvm-network-reader"
+  kvm_network_name = var.local_network.profile_name
+}
+
+module "bridge_network_profile_reader" {
+  count            = var.bridge_network.profile_name != null && coalesce(var.bridge_network.is_enabled, true) ? 1 : 0
+  source           = "../quick-kvm-network-reader"
+  kvm_network_name = var.bridge_network.profile_name
+}
+
+locals {
+  # profile_name has priority over profile
+  _local_reader_profile = (
+    length(module.local_network_profile_reader) > 0
+    ? module.local_network_profile_reader[0].profile
+    : null
+  )
+  _bridge_reader_profile = (
+    length(module.bridge_network_profile_reader) > 0
+    ? module.bridge_network_profile_reader[0].profile
+    : null
+  )
+
+  resolved_local_network_profile = local._local_reader_profile != null ? local._local_reader_profile : (
+    var.local_network.profile != null ? {
+      kvm_network_name = try(var.local_network.profile.kvm_network_name, "")
+      dhcp_mode        = try(var.local_network.profile.dhcp_mode, "dhcp")
+      mask             = try(var.local_network.profile.mask, "")
+      gateway4         = try(var.local_network.profile.gateway4, "")
+      nameservers      = try(var.local_network.profile.nameservers, [])
+      bridge           = null
+      mode             = null
+      error            = try(var.local_network.profile.error, "")
+    } : null
+  )
+
+  resolved_bridge_network_profile = local._bridge_reader_profile != null ? local._bridge_reader_profile : (
+    var.bridge_network.profile != null ? {
+      kvm_network_name = try(var.bridge_network.profile.kvm_network_name, "")
+      dhcp_mode        = try(var.bridge_network.profile.dhcp_mode, "dhcp")
+      mask             = try(var.bridge_network.profile.mask, "")
+      gateway4         = try(var.bridge_network.profile.gateway4, "")
+      nameservers      = try(var.bridge_network.profile.nameservers, [])
+      bridge           = try(var.bridge_network.profile.bridge, "")
+      mode             = null
+      error            = try(var.bridge_network.profile.error, "")
+    } : null
+  )
 }
 
 locals {
@@ -27,11 +80,11 @@ locals {
     ip = try(coalesce(var.local_network.ip,""),"")
     is_enabled = coalesce(var.local_network.is_enabled, true)
     profile = coalesce(var.local_network.is_enabled, true) ? {
-      kvm_network_name = try(coalesce(var.local_network.profile.kvm_network_name, null),"")
-      dhcp_mode   = coalesce(var.local_network.profile.dhcp_mode, "dhcp")
-      mask        = try(coalesce(var.local_network.profile.mask, null),"")
-      gateway4    = try(coalesce(var.local_network.profile.gateway4, null),"")
-      nameservers = coalesce(var.local_network.profile.nameservers, [])
+      kvm_network_name = try(coalesce(local.resolved_local_network_profile.kvm_network_name, null),"")
+      dhcp_mode   = coalesce(local.resolved_local_network_profile.dhcp_mode, "dhcp")
+      mask        = try(coalesce(local.resolved_local_network_profile.mask, null),"")
+      gateway4    = try(coalesce(local.resolved_local_network_profile.gateway4, null),"")
+      nameservers = coalesce(local.resolved_local_network_profile.nameservers, [])
     } : {
       kvm_network_name = "?"
       dhcp_mode   = "?"
@@ -45,12 +98,12 @@ locals {
     ip = try(coalesce(var.bridge_network.ip,""),"?")
     is_enabled = coalesce(var.bridge_network.is_enabled, true)
     profile = coalesce(var.bridge_network.is_enabled, true) ? {
-      kvm_network_name = try(coalesce(var.bridge_network.profile.kvm_network_name, null),"")
-      dhcp_mode = coalesce(var.bridge_network.profile.dhcp_mode, "dhcp")
-      mask = try(coalesce(var.bridge_network.profile.mask, null),"")
-      gateway4 = try(coalesce(var.bridge_network.profile.gateway4, null),"")
-      nameservers = coalesce(var.bridge_network.profile.nameservers, [])
-      bridge = coalesce(var.bridge_network.profile.bridge, "")
+      kvm_network_name = try(coalesce(local.resolved_bridge_network_profile.kvm_network_name, null),"")
+      dhcp_mode = coalesce(local.resolved_bridge_network_profile.dhcp_mode, "dhcp")
+      mask = try(coalesce(local.resolved_bridge_network_profile.mask, null),"")
+      gateway4 = try(coalesce(local.resolved_bridge_network_profile.gateway4, null),"")
+      nameservers = coalesce(local.resolved_bridge_network_profile.nameservers, [])
+      bridge = coalesce(local.resolved_bridge_network_profile.bridge, "")
     } : {
       kvm_network_name = "?"
       dhcp_mode   = "?"

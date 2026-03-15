@@ -31,14 +31,14 @@ resource "null_resource" "validate_vm" {
 resource "null_resource" "validate_local_network" {
   lifecycle {
     precondition {
-      condition     = !(local.current_local_network.is_enabled && local.current_local_network.profile == null)
-      error_message = "local_network.profile must be set when is_enabled is true  [vm_name:${var.name}]"
+      condition     = !(local.current_local_network.is_enabled && try(local.resolved_local_network_profile.error, "") != "")
+      error_message = "VM '${var.name}' wants to use local network '${try(local.resolved_local_network_profile.kvm_network_name, "unknown")}', but there is a problem with this network: ${try(local.resolved_local_network_profile.error, "")}"
     }
 
-    # precondition {
-    #   condition = !(local.current_local_network.is_enabled && (local.current_local_network.profile.kvm_network_name == null || local.current_local_network.profile.kvm_network_name == ""))
-    #   error_message = "local_network.profile.network_name must be set when is_enabled is true [vm_name:${var.name}]"
-    # }
+    precondition {
+      condition     = !(local.current_local_network.is_enabled && local.current_local_network.profile == null)
+      error_message = "local_network.profile must be set when is_enabled is true [vm_name:${var.name}]"
+    }
 
     precondition {
       condition     = local.current_local_network.profile.dhcp_mode != "static" || (
@@ -60,14 +60,14 @@ resource "null_resource" "validate_local_network" {
 resource "null_resource" "validate_bridge_network" {
   lifecycle {
     precondition {
-      condition     = !(local.current_bridge_network.is_enabled && local.current_bridge_network.profile == null)
-      error_message = "bridge_network.profile must be set when is_enabled is true  [vm_name:${var.name}]"
+      condition     = !(local.current_bridge_network.is_enabled && try(local.resolved_bridge_network_profile.error, "") != "")
+      error_message = "VM '${var.name}' wants to use bridge network '${try(local.resolved_bridge_network_profile.kvm_network_name, "unknown")}', but there is a problem with this network: ${try(local.resolved_bridge_network_profile.error, "")}"
     }
 
-    # precondition {
-    #   condition = !(local.current_bridge_network.is_enabled && (local.current_bridge_network.profile.kvm_network_name == null || local.current_bridge_network.profile.kvm_network_name == ""))
-    #   error_message = "current_bridge_network.profile.network_name must be set when is_enabled is true  [vm_name:${var.name}]"
-    # }
+    precondition {
+      condition     = !(local.current_bridge_network.is_enabled && local.current_bridge_network.profile == null)
+      error_message = "bridge_network.profile must be set when is_enabled is true [vm_name:${var.name}]"
+    }
 
     precondition {
       condition     = local.current_bridge_network.profile.dhcp_mode != "static" || (

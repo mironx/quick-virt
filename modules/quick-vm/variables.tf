@@ -61,12 +61,14 @@ variable "local_network" {
   type = object({
     ip = optional(string)
     is_enabled = optional(bool)
+    profile_name = optional(string)
     profile = optional(object({
       kvm_network_name = optional(string)
       dhcp_mode = optional(string)
       mask      = optional(string)
       gateway4  = optional(string)
       nameservers = optional(list(string))
+      error = optional(string, "")
     }))
   })
   default = {
@@ -80,6 +82,7 @@ variable "bridge_network" {
    type = object({
     ip = optional(string)
     is_enabled = optional(bool)
+    profile_name = optional(string)
     profile = optional(object({
       kvm_network_name = optional(string)
       dhcp_mode = optional(string)
@@ -87,6 +90,7 @@ variable "bridge_network" {
       gateway4  = optional(string)
       nameservers = optional(list(string))
       bridge = string
+      error = optional(string, "")
     }))
   })
   default = {

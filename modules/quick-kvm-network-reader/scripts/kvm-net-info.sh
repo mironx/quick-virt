@@ -51,45 +51,70 @@
 
 set -euo pipefail
 
+log() {
+  echo "[kvm-net-info] $*" >&2
+}
+
 if [ $# -eq 1 ]; then
   NET_NAME="$1"
+  log "Invoked as CLI with argument: $NET_NAME"
 else
   JSON_INPUT=$(cat)
-  if echo "$JSON_INPUT" | jq -e .kvm_network_name > /dev/null; then
+  log "Invoked via JSON stdin: $JSON_INPUT"
+  if echo "$JSON_INPUT" | jq -e .kvm_network_name > /dev/null 2>&1; then
     NET_NAME=$(echo "$JSON_INPUT" | jq -r .kvm_network_name)
+    log "Parsed network name: $NET_NAME"
   else
-    echo "Usage: $0 <kvm_network_name> OR pass JSON via stdin" >&2
+    log "ERROR: Missing 'kvm_network_name' key in JSON input"
+    log "Usage: $0 <kvm_network_name> OR pass JSON via stdin with {\"kvm_network_name\": \"...\"}"
     exit 1
   fi
 fi
 
-XML=$(virsh net-dumpxml "$NET_NAME")
+log "Fetching libvirt network XML for '$NET_NAME'..."
+if ! XML=$(virsh net-dumpxml "$NET_NAME" 2>&1); then
+  log "ERROR: Failed to get network XML for '$NET_NAME'. Is the network defined?"
+  log "virsh output: $XML"
+  exit 1
+fi
 
 MODE=$(echo "$XML" | xmllint --xpath "string(//forward/@mode)" - 2>/dev/null || echo "")
 BRIDGE=$(echo "$XML" | xmllint --xpath "string(//bridge/@name)" -)
+log "Network '$NET_NAME': mode='$MODE', bridge='$BRIDGE'"
 
 if [[ "$MODE" == "nat" ]]; then
   GATEWAY=$(echo "$XML" | xmllint --xpath "string(//ip/@address)" -)
   PREFIX=$(echo "$XML" | xmllint --xpath "string(//ip/@prefix)" -)
   CIDR="$GATEWAY/$PREFIX"
+  log "NAT mode: gateway=$GATEWAY, prefix=$PREFIX"
 else
-  IFACE_INFO=$(ip -o -4 addr show "$BRIDGE" | grep inet || true)
+  log "Bridge mode: checking interface '$BRIDGE' for IPv4 address..."
+  IFACE_INFO=$(ip -o -4 addr show "$BRIDGE" 2>&1 | grep inet || true)
   if [ -z "$IFACE_INFO" ]; then
-    echo "{\"error\": \"Bridge interface $BRIDGE has no IPv4 address\"}"
-    exit 1
+    LINK_STATE=$(ip link show "$BRIDGE" 2>&1 || true)
+    log "WARNING: Bridge interface '$BRIDGE' has no IPv4 address — returning empty profile"
+    log "Interface state: $LINK_STATE"
+    log "Hint: Ensure '$BRIDGE' is UP and has an IP assigned (e.g., via DHCP or static config)"
+    echo "{\"mode\": \"bridge\", \"network\": \"\", \"mask_prefix\": \"\", \"mask_ip\": \"\", \"gateway\": \"\", \"bridge\": \"$BRIDGE\", \"error\": \"Bridge interface $BRIDGE has no IPv4 address\"}"
+    exit 0
   fi
   CIDR=$(echo "$IFACE_INFO" | awk '{print $4}')
-  GATEWAY=$(echo "$CIDR" | cut -d/ -f1)
   PREFIX=$(echo "$CIDR" | cut -d/ -f2)
+  GATEWAY=$(ip route | grep "default.*dev $BRIDGE" | awk '{print $3}' | head -1)
+  if [ -z "$GATEWAY" ]; then
+    GATEWAY=$(echo "$CIDR" | cut -d/ -f1)
+    log "Bridge mode: no default route via $BRIDGE, falling back to interface IP as gateway"
+  fi
+  log "Bridge mode: cidr=$CIDR, gateway=$GATEWAY, prefix=$PREFIX"
 fi
 
 NETWORK=$(ipcalc "$CIDR" | grep -w "Network" | awk '{print $2}' | cut -d/ -f1)
 NETMASK=$(ipcalc "$CIDR" | grep -w "Netmask" | awk '{print $2}')
+log "Computed: network=$NETWORK, netmask=$NETMASK"
 
-# Return data as JSON (stdout)
+# Return data as JSON (stdout only — all debug goes to stderr)
 if [[ "$MODE" == "bridge" ]]; then
-  echo "{\"mode\": \"$MODE\", \"network\": \"$NETWORK\", \"mask_prefix\": \"$PREFIX\", \"mask_ip\": \"$NETMASK\", \"gateway\": \"$GATEWAY\", \"bridge\": \"$BRIDGE\"}"
+  echo "{\"mode\": \"$MODE\", \"network\": \"$NETWORK\", \"mask_prefix\": \"$PREFIX\", \"mask_ip\": \"$NETMASK\", \"gateway\": \"$GATEWAY\", \"bridge\": \"$BRIDGE\", \"error\": \"\"}"
 else
-  echo "{\"mode\": \"$MODE\", \"network\": \"$NETWORK\", \"mask_prefix\": \"$PREFIX\", \"mask_ip\": \"$NETMASK\", \"gateway\": \"$GATEWAY\"}"
+  echo "{\"mode\": \"$MODE\", \"network\": \"$NETWORK\", \"mask_prefix\": \"$PREFIX\", \"mask_ip\": \"$NETMASK\", \"gateway\": \"$GATEWAY\", \"error\": \"\"}"
 fi
-

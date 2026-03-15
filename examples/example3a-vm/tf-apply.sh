@@ -1,2 +1,2 @@
 #!/bin/bash
-terraform apply -var-file=../networks.tfvars
+terraform apply
