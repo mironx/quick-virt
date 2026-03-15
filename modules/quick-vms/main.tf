@@ -45,7 +45,7 @@ locals {
       user_name     = set_val.user.name,
       user_password = set_val.user.password
     })
-      : error("Both cloud_init_user_data_template and cloud_init_user_data_path are null for set '${set_key}'")
+      : file("ERROR: Both cloud_init_user_data_template and cloud_init_user_data_path are null for set '${set_key}'")
     )
     )
   }
