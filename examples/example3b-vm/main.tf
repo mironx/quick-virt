@@ -18,13 +18,13 @@ locals {
 module "local_network_profile_reader" {
   count            = local.use_network_local ? 1 : 0
   source           = "../../modules/quick-kvm-network-reader"
-  kvm_network_name = "neta-loc-1"
+  kvm_network_name = "qvexample-neta-loc-1"
 }
 
 module "bridge_network_profile_reader" {
   count            = local.use_network_bridge ? 1 : 0
   source           = "../../modules/quick-kvm-network-reader"
-  kvm_network_name = "net-bridge"
+  kvm_network_name = "qvexample-net-bridge"
 }
 
 locals {
@@ -65,7 +65,7 @@ module "vm1" {
   }
   local_network = {
     is_enabled = local.use_network_local
-    ip         = local.use_network_local ? "192.168.100.16" : null
+    ip         = local.use_network_local ? "192.168.200.16" : null
     profile    = local.local_network_profile_static
   }
   bridge_network = {
@@ -147,12 +147,12 @@ module "vm7" {
   vm_profile = local.vm_profile
   local_network = {
     is_enabled   = local.use_network_local
-    ip           = "192.168.100.20"
-    profile_name = "neta-loc-1"
+    ip           = "192.168.200.20"
+    profile_name = "qvexample-neta-loc-1"
   }
   bridge_network = {
     is_enabled   = local.use_network_bridge
     ip           = "172.16.0.20"
-    profile_name = "net-bridge"
+    profile_name = "qvexample-net-bridge"
   }
 }

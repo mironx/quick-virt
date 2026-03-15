@@ -99,8 +99,12 @@ else
     exit 0
   fi
   CIDR=$(echo "$IFACE_INFO" | awk '{print $4}')
-  GATEWAY=$(echo "$CIDR" | cut -d/ -f1)
   PREFIX=$(echo "$CIDR" | cut -d/ -f2)
+  GATEWAY=$(ip route | grep "default.*dev $BRIDGE" | awk '{print $3}' | head -1)
+  if [ -z "$GATEWAY" ]; then
+    GATEWAY=$(echo "$CIDR" | cut -d/ -f1)
+    log "Bridge mode: no default route via $BRIDGE, falling back to interface IP as gateway"
+  fi
   log "Bridge mode: cidr=$CIDR, gateway=$GATEWAY, prefix=$PREFIX"
 fi
 

@@ -12,13 +12,13 @@ provider "libvirt" {
 
 locals {
   use_network_local  = true
-  use_network_bridge = false
+  use_network_bridge = true
 }
 
 module "vms" {
   source                  = "../../modules/quick-vms"
-  local-kvm-network-name  = local.use_network_local ? "neta-loc-2" : null
-  bridge-kvm-network-name = local.use_network_bridge ? "net-bridge" : null
+  local-kvm-network-name  = local.use_network_local ? "qvexample-neta-loc-2" : null
+  bridge-kvm-network-name = local.use_network_bridge ? "qvexample-net-bridge" : null
 
   machines = {
     masters = {
@@ -38,19 +38,19 @@ module "vms" {
       nodes = [
         {
           name        = "v1"
-          local_ip    = "192.168.101.3"
+          local_ip    = "192.168.201.3"
           bridge_ip   = "172.20.0.17"
           description = "black virtual machine"
         },
         {
           name        = "v2"
-          local_ip    = "192.168.101.4"
+          local_ip    = "192.168.201.4"
           bridge_ip   = "172.20.0.18"
           description = "black virtual machine"
         },
         {
           name        = "v3"
-          local_ip    = "192.168.101.5"
+          local_ip    = "192.168.201.5"
           bridge_ip   = "172.20.0.19"
           description = "black virtual machine"
         }
@@ -73,25 +73,25 @@ module "vms" {
       nodes = [
         {
           name        = "v1"
-          local_ip    = "192.168.101.33"
+          local_ip    = "192.168.201.33"
           bridge_ip   = "172.20.0.37"
           description = "black virtual machine"
         },
         {
           name        = "v2"
-          local_ip    = "192.168.101.34"
+          local_ip    = "192.168.201.34"
           bridge_ip   = "172.20.0.38"
           description = "black virtual machine"
         },
         {
           name        = "v3"
-          local_ip    = "192.168.101.35"
+          local_ip    = "192.168.201.35"
           bridge_ip   = "172.20.0.39"
           description = "black virtual machine"
         },
         {
           name        = "v4"
-          local_ip    = "192.168.101.36"
+          local_ip    = "192.168.201.36"
           bridge_ip   = "172.20.0.40"
           description = "black virtual machine"
         }

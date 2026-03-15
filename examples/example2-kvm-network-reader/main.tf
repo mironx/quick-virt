@@ -1,8 +1,8 @@
 locals {
   kvm_networks = [
-    "net-bridge",
-    "neta-loc-1",
-    "neta-loc-2",
+    "qvexample-net-bridge",
+    "qvexample-neta-loc-1",
+    "qvexample-neta-loc-2",
   ]
 }
 
