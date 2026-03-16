@@ -41,9 +41,58 @@ tasks:
     desc: Remove all KVM networks
     cmd: sudo {{.SCRIPTS_DIR}}/tools/clean-kvm-network.sh
 
-  tools:get-ubuntu22:
+  tools:init-cloud-config:
+    desc: Create a cloud-init user-data template (requires DIR=<path>)
+    cmd: '{{.SCRIPTS_DIR}}/tools/init-cloud-config.sh {{.DIR}}'
+    requires:
+      vars: [DIR]
+
+  # ---------------------------------------------------------------------------
+  # OS Images
+  # ---------------------------------------------------------------------------
+  images:list:
+    desc: List all OS images and their download status
+    cmd: '{{.SCRIPTS_DIR}}/tools/get-os-image.sh list'
+
+  images:download:all:
+    desc: Download all OS cloud images
+    cmd: '{{.SCRIPTS_DIR}}/tools/get-os-image.sh all'
+
+  images:download:ubuntu22:
     desc: Download Ubuntu 22.04 cloud image
-    cmd: sudo {{.SCRIPTS_DIR}}/tools/get-iso-ubuntu22.sh
+    cmd: '{{.SCRIPTS_DIR}}/tools/get-os-image.sh ubuntu_22'
+
+  images:download:ubuntu24:
+    desc: Download Ubuntu 24.04 cloud image
+    cmd: '{{.SCRIPTS_DIR}}/tools/get-os-image.sh ubuntu_24'
+
+  images:download:rocky9:
+    desc: Download Rocky Linux 9 cloud image
+    cmd: '{{.SCRIPTS_DIR}}/tools/get-os-image.sh rocky_9'
+
+  images:download:debian12:
+    desc: Download Debian 12 cloud image
+    cmd: '{{.SCRIPTS_DIR}}/tools/get-os-image.sh debian_12'
+
+  images:remove:all:
+    desc: Remove all downloaded OS images
+    cmd: '{{.SCRIPTS_DIR}}/tools/get-os-image.sh remove all'
+
+  images:remove:ubuntu22:
+    desc: Remove Ubuntu 22.04 cloud image
+    cmd: '{{.SCRIPTS_DIR}}/tools/get-os-image.sh remove ubuntu_22'
+
+  images:remove:ubuntu24:
+    desc: Remove Ubuntu 24.04 cloud image
+    cmd: '{{.SCRIPTS_DIR}}/tools/get-os-image.sh remove ubuntu_24'
+
+  images:remove:rocky9:
+    desc: Remove Rocky Linux 9 cloud image
+    cmd: '{{.SCRIPTS_DIR}}/tools/get-os-image.sh remove rocky_9'
+
+  images:remove:debian12:
+    desc: Remove Debian 12 cloud image
+    cmd: '{{.SCRIPTS_DIR}}/tools/get-os-image.sh remove debian_12'
 
   # ---------------------------------------------------------------------------
   # KVM Network Reader

@@ -91,7 +91,7 @@ Reads KVM storage pool information.
 |--------|-------------|
 | `clean-all-vms.sh` | Force-removes all VMs (destroy + undefine). Use when Terraform state is broken or inconsistent. |
 | `clean-kvm-network.sh` | Force-removes all KVM-defined networks. |
-| `get-iso-ubuntu22.sh` | Downloads Ubuntu 22.04 cloud image for use as VM base disk. |
+| `get-os-image.sh` | Download, list, and remove OS cloud images (ubuntu_22, ubuntu_24, rocky_9, debian_12). |
 
 ## Network Flow
 

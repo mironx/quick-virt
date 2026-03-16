@@ -17,11 +17,31 @@ output "vm_networks" {
   value = [
     for idx, n in local.resolved_networks : {
       index            = idx
-      interface        = "enp0s${idx + 3}"
+      interface        = "${local.selected_os.interface_naming}${idx + local.selected_os.interface_offset}"
       ip               = n.ip
       profile_name     = n.profile_name
       kvm_network_name = try(n.profile.kvm_network_name, n.profile_name)
     }
   ]
   description = "Resolved network configuration for the VM"
+}
+
+output "vm_os_profile" {
+  value = {
+    os_name          = coalesce(var.os_name, "ubuntu_22")
+    image            = local.selected_os.image
+    os_image_mode       = var.os_image_mode
+    os_disk_mode        = var.os_disk_mode
+    network_template = local.selected_os.network_template
+    interface_naming = local.selected_os.interface_naming
+  }
+  description = "Resolved OS profile for the VM"
+}
+
+output "vm_profile" {
+  value = {
+    vcpu   = local.current_vm_profile.vcpu
+    memory = local.current_vm_profile.memory
+  }
+  description = "VM compute profile"
 }

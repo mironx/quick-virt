@@ -12,15 +12,95 @@ terraform {
 }
 
 //-------------------------------------------------------------------------------
+// OS profiles
+//-------------------------------------------------------------------------------
+
+locals {
+  os_profiles = {
+    ubuntu_22 = {
+      image_local      = "/var/lib/libvirt/images/ubuntu-2204.qcow2.base"
+      image_url        = "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
+      network_template = "netplan"
+      interface_naming = "enp0s"
+      interface_offset = 3
+    }
+    ubuntu_24 = {
+      image_local      = "/var/lib/libvirt/images/ubuntu-2404.qcow2.base"
+      image_url        = "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
+      network_template = "netplan"
+      interface_naming = "enp0s"
+      interface_offset = 3
+    }
+    rocky_9 = {
+      image_local      = "/var/lib/libvirt/images/rocky-9.qcow2.base"
+      image_url        = "https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base.latest.x86_64.qcow2"
+      network_template = "networkmanager"
+      interface_naming = "eth"
+      interface_offset = 0
+    }
+    debian_12 = {
+      image_local      = "/var/lib/libvirt/images/debian-12.qcow2.base"
+      image_url        = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2"
+      network_template = "netplan"
+      interface_naming = "enp0s"
+      interface_offset = 3
+    }
+  }
+
+  # Resolve OS: os_volume > os_profile > os_name > default ubuntu_22
+  _builtin_os = local.os_profiles[coalesce(var.os_name, "ubuntu_22")]
+
+  # Priority: os_volume > os_profile > os_name > default ubuntu_22
+  selected_os = var.os_volume != null ? var.os_volume.os_profile : (
+    var.os_profile != null ? {
+      image            = var.os_profile.image
+      network_template = var.os_profile.network_template
+      interface_naming = var.os_profile.interface_naming
+      interface_offset = try(var.os_profile.interface_offset, 3)
+    } : {
+      image            = var.os_image_mode == "local" ? local._builtin_os.image_local : local._builtin_os.image_url
+      network_template = local._builtin_os.network_template
+      interface_naming = local._builtin_os.interface_naming
+      interface_offset = local._builtin_os.interface_offset
+    }
+  )
+}
+
+//-------------------------------------------------------------------------------
 // Networks: filter enabled, read profiles, resolve
 //-------------------------------------------------------------------------------
 
 locals {
-  enabled_networks = [for n in var.networks : n if n.enabled]
+  # If kvm-networks is provided, use it to determine enabled state; otherwise use per-network enabled field
+  _has_kvm_networks = length(var.kvm-networks) > 0
 
-  # Networks that need reader (profile_name set, no manual profile)
+  enabled_networks = [
+    for n in var.networks : n
+    if local._has_kvm_networks ? try(var.kvm-networks[n.profile_name].enabled, false) : n.enabled
+  ]
+
+  # Resolve kvm-networks profile override: kvm-networks profile > per-network profile
+  _networks_with_kvm_profile = [
+    for n in local.enabled_networks : merge(n, {
+      profile = (
+        local._has_kvm_networks && try(var.kvm-networks[n.profile_name].profile, null) != null
+        ? {
+          kvm_network_name = try(var.kvm-networks[n.profile_name].profile.kvm_network_name, n.profile_name)
+          dhcp_mode        = try(var.kvm-networks[n.profile_name].profile.dhcp_mode, "static")
+          gateway4         = var.kvm-networks[n.profile_name].profile.gateway4
+          mask             = var.kvm-networks[n.profile_name].profile.mask
+          nameservers      = var.kvm-networks[n.profile_name].profile.nameservers
+          bridge           = try(var.kvm-networks[n.profile_name].profile.bridge, null)
+          error            = ""
+        }
+        : n.profile
+      )
+    })
+  ]
+
+  # Networks that need reader (profile_name set, no manual profile resolved)
   networks_needing_reader = {
-    for idx, n in local.enabled_networks :
+    for idx, n in local._networks_with_kvm_profile :
     tostring(idx) => n.profile_name
     if n.profile_name != null && n.profile == null
   }
@@ -36,7 +116,7 @@ locals {
   # Resolve profiles: manual profile > reader > null
   # Normalize all profiles to the same object shape to avoid type mismatches
   resolved_networks = [
-    for idx, n in local.enabled_networks : {
+    for idx, n in local._networks_with_kvm_profile : {
       ip           = try(coalesce(n.ip, ""), "")
       profile_name = n.profile_name
       profile = n.profile != null ? {
@@ -72,13 +152,10 @@ locals {
 
 locals {
   current_vm_profile = {
-    image_source = coalesce(var.vm_profile.image_source, "/var/lib/libvirt/images/ubuntu-2204.qcow2.base")
     vcpu   = coalesce(var.vm_profile.vcpu, null)
     memory = coalesce(var.vm_profile.memory, null)
-    cpu = var.vm_profile.cpu != null ? {
-      mode = var.vm_profile.cpu.mode
-    } : {
-      mode = null
+    cpu = {
+      mode = try(var.vm_profile.cpu.mode, "host-passthrough")
     }
   }
 
@@ -90,18 +167,21 @@ locals {
 //-------------------------------------------------------------------------------
 
 locals {
-  network_config = templatefile("${path.module}/templates/network-config.tmpl", {
-    networks = [
-      for idx, n in local.resolved_networks : {
-        interface = "enp0s${idx + 3}"
-        ip        = n.ip
-        mask      = try(n.profile.mask, "")
-        gateway4  = try(n.profile.gateway4, "")
-        nameservers = try(n.profile.nameservers, [])
-        dhcp      = try(n.profile.dhcp_mode, "static") == "dhcp"
-      }
-    ]
-  })
+  network_config = templatefile(
+    "${path.module}/templates/network-config-${local.selected_os.network_template}.tmpl",
+    {
+      networks = [
+        for idx, n in local.resolved_networks : {
+          interface   = "${local.selected_os.interface_naming}${idx + local.selected_os.interface_offset}"
+          ip          = n.ip
+          mask        = try(n.profile.mask, "")
+          gateway4    = try(n.profile.gateway4, "")
+          nameservers = try(n.profile.nameservers, [])
+          dhcp        = try(n.profile.dhcp_mode, "static") == "dhcp"
+        }
+      ]
+    }
+  )
 
   user_data = replace(var.user_data, "HOST_NAME", var.name)
 
@@ -113,7 +193,7 @@ locals {
   running      = var.running
   autostart    = var.autostart
   description  = var.description
-  storage_pool = var.storage_pool
+  storage_pool = var.os_volume != null ? var.os_volume.pool : var.storage_pool
 }
 
 locals {
@@ -134,12 +214,14 @@ locals {
   main_storage_size = local.main_storage.size * 1024 * 1024 * 1024
 }
 
+# Per-VM reference volume — only for backing_store without os_volume
 resource "libvirt_volume" "vm-disk-reference" {
-  name = "${var.name}-ref.qcow2"
-  pool = local.storage_pool
+  count = var.os_volume == null && var.os_disk_mode == "backing_store" ? 1 : 0
+  name  = "${var.name}-ref.qcow2"
+  pool  = local.storage_pool
   create = {
     content = {
-      url = local.current_vm_profile.image_source
+      url = local.selected_os.image
     }
   }
   target = {
@@ -149,13 +231,26 @@ resource "libvirt_volume" "vm-disk-reference" {
   }
 }
 
-resource "libvirt_volume" "vm-disk" {
+locals {
+  # Base image path for backing_store only (clone uses selected_os.image directly)
+  base_image_path = (
+    var.os_disk_mode == "clone"
+    ? null
+    : var.os_volume != null
+      ? var.os_volume.path
+      : libvirt_volume.vm-disk-reference[0].path
+  )
+}
+
+# backing_store mode: thin disk referencing base image
+resource "libvirt_volume" "vm-disk-thin" {
+  count    = var.os_disk_mode == "backing_store" ? 1 : 0
   name     = "${var.name}.qcow2"
   pool     = local.storage_pool
   capacity = local.main_storage_size
 
   backing_store = {
-    path = libvirt_volume.vm-disk-reference.path
+    path = local.base_image_path
     format = {
       type = "qcow2"
     }
@@ -166,6 +261,31 @@ resource "libvirt_volume" "vm-disk" {
       type = "qcow2"
     }
   }
+}
+
+# clone mode: full independent copy directly from original image source
+# Uses selected_os.image (local path or URL) — not the libvirt-managed reference volume
+resource "libvirt_volume" "vm-disk-clone" {
+  count    = var.os_disk_mode == "clone" ? 1 : 0
+  name     = "${var.name}.qcow2"
+  pool     = local.storage_pool
+  capacity = local.main_storage_size
+
+  create = {
+    content = {
+      url = local.selected_os.image
+    }
+  }
+
+  target = {
+    format = {
+      type = "qcow2"
+    }
+  }
+}
+
+locals {
+  vm_disk_name = var.os_disk_mode == "backing_store" ? libvirt_volume.vm-disk-thin[0].name : libvirt_volume.vm-disk-clone[0].name
 }
 
 resource "libvirt_cloudinit_disk" "cloudinit" {
@@ -242,7 +362,7 @@ resource "libvirt_domain" "vm" {
         source = {
           volume = {
             pool   = local.storage_pool
-            volume = libvirt_volume.vm-disk.name
+            volume = local.vm_disk_name
           }
         }
         target = {
@@ -311,7 +431,8 @@ resource "libvirt_domain" "vm" {
   description = local.description
 
   depends_on = [
-    libvirt_volume.vm-disk,
+    libvirt_volume.vm-disk-thin,
+    libvirt_volume.vm-disk-clone,
     libvirt_volume.cloudinit,
   ]
 }

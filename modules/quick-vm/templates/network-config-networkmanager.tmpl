@@ -1,0 +1,19 @@
+version: 1
+config:
+%{ for net in networks }
+  - type: physical
+    name: ${net.interface}
+%{ if net.dhcp }
+    subnets:
+      - type: dhcp
+%{ else }
+    subnets:
+      - type: static
+        address: ${net.ip}/${net.mask}
+        gateway: ${net.gateway4}
+        dns_nameservers:
+%{ for ns in net.nameservers ~}
+          - ${ns}
+%{ endfor ~}
+%{ endif }
+%{ endfor }

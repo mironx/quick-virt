@@ -10,6 +10,10 @@ provider "libvirt" {
   uri = "qemu:///system"
 }
 
+locals {
+  prefix = "qvms-ex4"
+}
+
 module "vms" {
   source = "../../modules/quick-vms"
 
@@ -20,7 +24,8 @@ module "vms" {
 
   machines = {
     masters = {
-      set_name = "black-master"
+      set_name = "${local.prefix}-master"
+      os_name  = "ubuntu_22"
       vm_profile = {
         vcpu   = 1
         memory = 2048
@@ -61,7 +66,8 @@ module "vms" {
       ]
     }
     workers = {
-      set_name = "black-worker"
+      set_name = "${local.prefix}-worker"
+      os_name  = "ubuntu_22"
       vm_profile = {
         vcpu   = 3
         memory = 4048
