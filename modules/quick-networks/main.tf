@@ -2,7 +2,7 @@ terraform {
   required_providers {
     libvirt = {
       source  = "dmacvicar/libvirt"
-      version = "~> 0.8.0"
+      version = "~> 0.9.0"
     }
   }
 }
@@ -15,12 +15,22 @@ resource "libvirt_network" "network" {
   for_each = local.networks
 
   name      = each.value.kvm_network_name
-  mode      = each.value.mode
   autostart = each.value.autostart
-  addresses = ["${each.value.gateway4}/${each.value.mask}"]
 
-  domain = each.value.mode == "nat" ? each.value.domain : null
-  bridge = each.value.mode == "bridge" ? each.value.bridge : null
+  forward = {
+    mode = each.value.mode
+  }
+
+  ips = each.value.mode != "bridge" ? [{
+    address = each.value.gateway4
+    prefix  = tonumber(each.value.mask)
+  }] : null
+
+  domain = each.value.mode == "nat" && try(each.value.domain, null) != null ? {
+    name = each.value.domain
+  } : null
+
+  bridge = each.value.mode == "bridge" && try(each.value.bridge, null) != null ? {
+    name = each.value.bridge
+  } : null
 }
-
-

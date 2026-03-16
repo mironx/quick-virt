@@ -12,7 +12,7 @@ provider "libvirt" {
 
 locals {
   use_network_local  = true
-  use_network_bridge = false
+  use_network_bridge = true
 }
 
 module "local_network_profile_reader" {

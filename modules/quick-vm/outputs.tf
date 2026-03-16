@@ -9,6 +9,6 @@ output "vm_id" {
 }
 
 output "vm_ips" {
-  value       = libvirt_domain.vm.network_interface[*].addresses
+  value       = try(libvirt_domain.vm.devices.interfaces[*].addresses, [])
   description = "List of IP addresses assigned to the virtual machine"
 }
