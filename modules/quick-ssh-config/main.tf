@@ -2,7 +2,7 @@ locals {
   set_name      = var.set_name
   identity_file = var.identity_file != null ? var.identity_file : "~/.ssh/id_rsa"
   nodes         = var.nodes
-  file_name     = var.file_name != null ? var.file_name : "${path.root}/quick-ssh-config-${local.set_name}"
+  file_name     = var.file_name != null ? var.file_name : "${path.root}/qv-ssh-config-${local.set_name}.qv-info"
 
   host_entries = flatten([
     for node in local.nodes : [
