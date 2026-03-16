@@ -130,6 +130,11 @@ module "vms" {
         vm_profile   = set_val.vm_profile
         main_storage = set_val.main_storage
         user_data    = local.user_data_map[set_key]
+        os_volume    = set_val.os_volume
+        os_name      = set_val.os_name
+        os_profile   = set_val.os_profile
+        os_image_mode   = set_val.os_image_mode
+        os_disk_mode    = set_val.os_disk_mode
         node         = node
       }
     }
@@ -141,6 +146,11 @@ module "vms" {
   user_data    = each.value.user_data
   vm_profile   = each.value.vm_profile
   main_storage = each.value.main_storage
+  os_volume    = each.value.os_volume
+  os_name      = each.value.os_name
+  os_profile   = each.value.os_profile
+  os_image_mode   = each.value.os_image_mode
+  os_disk_mode    = each.value.os_disk_mode
 
   networks = [
     for net in each.value.node.networks : {

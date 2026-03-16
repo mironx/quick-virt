@@ -11,6 +11,7 @@ provider "libvirt" {
 }
 
 locals {
+  prefix     = "qvms-ex3a"
   vm_profile = var.vm_profile
   user       = var.user
 }
@@ -25,7 +26,8 @@ locals {
 # vm1: static IP on both networks
 module "vm1" {
   source     = "../../modules/quick-vm"
-  name       = "vt1_static_both"
+  name       = "${local.prefix}-vt1_static_both"
+  os_name    = "ubuntu_22"
   user_data  = local.user_data
   vm_profile = local.vm_profile
   networks = [
@@ -37,7 +39,8 @@ module "vm1" {
 # vm2: DHCP on both networks
 module "vm2" {
   source     = "../../modules/quick-vm"
-  name       = "vt2_dhcp_both"
+  name       = "${local.prefix}-vt2_dhcp_both"
+  os_name    = "ubuntu_22"
   user_data  = local.user_data
   vm_profile = local.vm_profile
   networks = [
@@ -49,7 +52,8 @@ module "vm2" {
 # vm3: DHCP local only
 module "vm3" {
   source     = "../../modules/quick-vm"
-  name       = "vt3_dhcp_local_only"
+  name       = "${local.prefix}-vt3_dhcp_local_only"
+  os_name    = "ubuntu_22"
   user_data  = local.user_data
   vm_profile = local.vm_profile
   networks = [
@@ -60,7 +64,8 @@ module "vm3" {
 # vm4: DHCP bridge only
 module "vm4" {
   source     = "../../modules/quick-vm"
-  name       = "vt4_dhcp_bridge_only"
+  name       = "${local.prefix}-vt4_dhcp_bridge_only"
+  os_name    = "ubuntu_22"
   user_data  = local.user_data
   vm_profile = local.vm_profile
   networks = [
@@ -68,10 +73,11 @@ module "vm4" {
   ]
 }
 
-# vm5: DHCP local only (same as vm3, different name)
+# vm5: DHCP local only
 module "vm5" {
   source     = "../../modules/quick-vm"
-  name       = "vt5_dhcp_local_b"
+  name       = "${local.prefix}-vt5_dhcp_local_b"
+  os_name    = "ubuntu_22"
   user_data  = local.user_data
   vm_profile = local.vm_profile
   networks = [
@@ -79,10 +85,11 @@ module "vm5" {
   ]
 }
 
-# vm6: DHCP bridge only (same as vm4, different name)
+# vm6: DHCP bridge only
 module "vm6" {
   source     = "../../modules/quick-vm"
-  name       = "vt6_dhcp_bridge_b"
+  name       = "${local.prefix}-vt6_dhcp_bridge_b"
+  os_name    = "ubuntu_22"
   user_data  = local.user_data
   vm_profile = local.vm_profile
   networks = [
@@ -93,7 +100,8 @@ module "vm6" {
 # vm7: static IP using profile_name (reader auto-detects)
 module "vm7" {
   source     = "../../modules/quick-vm"
-  name       = "vt7_profile_name"
+  name       = "${local.prefix}-vt7_profile_name"
+  os_name    = "ubuntu_22"
   user_data  = local.user_data
   vm_profile = local.vm_profile
   networks = [
@@ -113,8 +121,10 @@ output "vms" {
       vm6 = module.vm6
       vm7 = module.vm7
     } : name => {
-      name     = mod.vm_name
-      networks = mod.vm_networks
+      name       = mod.vm_name
+      networks   = mod.vm_networks
+      os_profile = mod.vm_os_profile
+      vm_profile = mod.vm_profile
     }
   }
 }

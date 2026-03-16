@@ -33,6 +33,28 @@ variable "machines" {
     cloud_init_user_data_path     = optional(string)
     cloud_init_user_data_template = optional(string)
 
+    os_volume = optional(object({
+      path    = string
+      name    = string
+      pool    = string
+      os_name = string
+      os_profile = object({
+        image            = string
+        network_template = string
+        interface_naming = string
+        interface_offset = number
+      })
+    }))
+    os_name    = optional(string)
+    os_profile = optional(object({
+      image            = string
+      network_template = optional(string, "netplan")
+      interface_naming = optional(string, "enp0s")
+      interface_offset = optional(number, 3)
+    }))
+    os_image_mode = optional(string, "local")
+    os_disk_mode  = optional(string, "backing_store")
+
     nodes = list(object({
       name        = string
       description = optional(string)

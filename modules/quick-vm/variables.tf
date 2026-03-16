@@ -46,13 +46,86 @@ variable "main_storage" {
 
 variable "vm_profile" {
   type = object({
-    image_source = optional(string)
-    vcpu         = number
-    memory       = number
+    vcpu   = number
+    memory = number
     cpu = optional(object({
        mode = optional(string)
     }))
   })
+}
+
+variable "os_volume" {
+  description = "Shared base volume from quick-os-volume module. Takes priority over os_name/os_profile."
+  type = object({
+    path = string
+    name = string
+    pool = string
+    os_name = string
+    os_profile = object({
+      image            = string
+      network_template = string
+      interface_naming = string
+      interface_offset = number
+    })
+  })
+  default = null
+}
+
+variable "os_name" {
+  description = "Built-in OS profile name: ubuntu_22, ubuntu_24, rocky_9, debian_12"
+  type        = string
+  default     = null
+  validation {
+    condition     = var.os_name == null || contains(["ubuntu_22", "ubuntu_24", "rocky_9", "debian_12"], var.os_name)
+    error_message = "os_name must be one of: ubuntu_22, ubuntu_24, rocky_9, debian_12"
+  }
+}
+
+variable "os_profile" {
+  description = "Custom OS profile. Takes priority over os_name."
+  type = object({
+    image            = string
+    network_template = optional(string, "netplan")
+    interface_naming = optional(string, "enp0s")
+    interface_offset = optional(number, 3)
+  })
+  default = null
+}
+
+variable "os_image_mode" {
+  description = "Image source for built-in os_name profiles: 'local' uses local path, 'url' downloads from URL"
+  type        = string
+  default     = "local"
+  validation {
+    condition     = contains(["local", "url"], var.os_image_mode)
+    error_message = "os_image_mode must be 'local' or 'url'"
+  }
+}
+
+variable "os_disk_mode" {
+  description = "Disk provisioning: 'backing_store' (thin, fast, shared base) or 'clone' (full copy, independent)"
+  type        = string
+  default     = "backing_store"
+  validation {
+    condition     = contains(["backing_store", "clone"], var.os_disk_mode)
+    error_message = "os_disk_mode must be 'backing_store' or 'clone'"
+  }
+}
+
+variable "kvm-networks" {
+  description = "Map of KVM networks for global enable/disable and optional manual profiles. If set, overrides per-network 'enabled' field."
+  type = map(object({
+    enabled = optional(bool, true)
+    profile = optional(object({
+      kvm_network_name = optional(string)
+      dhcp_mode        = optional(string, "static")
+      gateway4         = string
+      mask             = string
+      nameservers      = list(string)
+      bridge           = optional(string)
+    }))
+  }))
+  default = {}
 }
 
 variable "networks" {
