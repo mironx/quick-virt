@@ -9,6 +9,11 @@ variable "file_name" {
   default     = null
 }
 
+variable "user" {
+  description = "SSH user name"
+  type        = string
+}
+
 variable "identity_file" {
   description = "Path to SSH identity file"
   type        = string

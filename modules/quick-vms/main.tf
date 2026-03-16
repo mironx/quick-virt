@@ -160,6 +160,7 @@ module "quick-ssh-config-generator" {
   for_each = local.machines
   source   = "../quick-ssh-config"
   set_name = each.value.set_name
+  user     = each.value.user.name
   nodes    = each.value.nodes
 }
 

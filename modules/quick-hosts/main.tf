@@ -14,7 +14,7 @@ resource "local_file" "hosts_file" {
       for node in local.nodes : [
         for idx, net in node.networks :
         net.ip != null && net.ip != "" ?
-          "${net.ip} ${local.set_name}-${node.name}${idx == 0 ? "" : "-${net.profile_name}"}"
+          "${net.ip} ${local.set_name}-${node.name}-net${idx}-${net.profile_name}"
         : null
       ]
     ],
