@@ -1,10 +1,11 @@
 output "vms_info" {
-  description = "Combined info (name, id, static IPs) for all virtual machines"
+  description = "Combined info (name, id, networks) for all virtual machines"
   value       = {
     for vm_key, vm in module.vms : vm_key => {
-      name = vm.vm_name
-      id   = vm.vm_id
-      ips  = vm.vm_ips
+      name     = vm.vm_name
+      id       = vm.vm_id
+      ips      = vm.vm_ips
+      networks = vm.vm_networks
     }
   }
 }

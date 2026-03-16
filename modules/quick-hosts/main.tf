@@ -1,7 +1,7 @@
 locals {
   set_name  = var.set_name
   nodes     = var.nodes
-  file_name = var.file_name != null ? var.file_name : "${path.root}/quick-hosts-${local.set_name}"
+  file_name = var.file_name != null ? var.file_name : "${path.root}/qv-hosts-${local.set_name}.qv-info"
 }
 
 resource "local_file" "hosts_file" {
@@ -11,13 +11,12 @@ resource "local_file" "hosts_file" {
     "#----------------------------- ${local.set_name}",
 
     [
-      for node in local.nodes : (
-        (node.local_ip != null && node.local_ip != "") || (node.bridge_ip != null && node.bridge_ip != "") ?
-        compact([
-          node.local_ip != null && node.local_ip != "" ? "${node.local_ip} ${local.set_name}-${node.name}" : null,
-          node.bridge_ip != null && node.bridge_ip != "" ? "${node.bridge_ip} ${local.set_name}-${node.name}-viabridge" : null
-        ]) : null
-      )
+      for node in local.nodes : [
+        for idx, net in node.networks :
+        net.ip != null && net.ip != "" ?
+          "${net.ip} ${local.set_name}-${node.name}-net${idx}-${net.profile_name}"
+        : null
+      ]
     ],
 
     "#----------------------------- ${local.set_name}"

@@ -10,15 +10,13 @@ provider "libvirt" {
   uri = "qemu:///system"
 }
 
-locals {
-  use_network_local  = false
-  use_network_bridge = true
-}
-
 module "vms" {
-  source                  = "../../modules/quick-vms"
-  local-kvm-network-name  = local.use_network_local ? "qvexample-neta-loc-2" : null
-  bridge-kvm-network-name = local.use_network_bridge ? "qvexample-net-bridge" : null
+  source = "../../modules/quick-vms"
+
+  kvm-networks = {
+    "qvexample-neta-loc-2" = { enabled = true }
+    "qvexample-net-bridge" = { enabled = true }
+  }
 
   machines = {
     masters = {
@@ -38,21 +36,27 @@ module "vms" {
       nodes = [
         {
           name        = "v1"
-          local_ip    = "192.168.201.3"
-          bridge_ip   = "172.20.0.17"
           description = "black virtual machine"
+          networks = [
+            { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.3" },
+            { profile_name = "qvexample-net-bridge", ip = "172.20.0.17" }
+          ]
         },
         {
           name        = "v2"
-          local_ip    = "192.168.201.4"
-          bridge_ip   = "172.20.0.18"
           description = "black virtual machine"
+          networks = [
+            { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.4" },
+            { profile_name = "qvexample-net-bridge", ip = "172.20.0.18" }
+          ]
         },
         {
           name        = "v3"
-          local_ip    = "192.168.201.5"
-          bridge_ip   = "172.20.0.19"
           description = "black virtual machine"
+          networks = [
+            { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.5" },
+            { profile_name = "qvexample-net-bridge", ip = "172.20.0.19" }
+          ]
         }
       ]
     }
@@ -73,27 +77,35 @@ module "vms" {
       nodes = [
         {
           name        = "v1"
-          local_ip    = "192.168.201.33"
-          bridge_ip   = "172.20.0.37"
           description = "black virtual machine"
+          networks = [
+            { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.33" },
+            { profile_name = "qvexample-net-bridge", ip = "172.20.0.37" }
+          ]
         },
         {
           name        = "v2"
-          local_ip    = "192.168.201.34"
-          bridge_ip   = "172.20.0.38"
           description = "black virtual machine"
+          networks = [
+            { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.34" },
+            { profile_name = "qvexample-net-bridge", ip = "172.20.0.38" }
+          ]
         },
         {
           name        = "v3"
-          local_ip    = "192.168.201.35"
-          bridge_ip   = "172.20.0.39"
           description = "black virtual machine"
+          networks = [
+            { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.35" },
+            { profile_name = "qvexample-net-bridge", ip = "172.20.0.39" }
+          ]
         },
         {
           name        = "v4"
-          local_ip    = "192.168.201.36"
-          bridge_ip   = "172.20.0.40"
           description = "black virtual machine"
+          networks = [
+            { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.36" },
+            { profile_name = "qvexample-net-bridge", ip = "172.20.0.40" }
+          ]
         }
       ]
     }
@@ -105,12 +117,7 @@ output "all_vms_info" {
   value       = module.vms.vms_info
 }
 
-output "local_network_profile" {
-  description = "local network profile"
-  value       = module.vms.local-network-profile
-}
-
-output "bridge_network_profile" {
-  description = "bridge network profile"
-  value       = module.vms.bridge-network-profile
+output "kvm_network_profiles" {
+  description = "Resolved network profiles"
+  value       = module.vms.kvm-network-profiles
 }

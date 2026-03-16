@@ -9,6 +9,11 @@ variable "file_name" {
   default     = null
 }
 
+variable "user" {
+  description = "SSH user name"
+  type        = string
+}
+
 variable "identity_file" {
   description = "Path to SSH identity file"
   type        = string
@@ -16,10 +21,12 @@ variable "identity_file" {
 }
 
 variable "nodes" {
-  description = "List of nodes with name, local_ip, and bridge_ip"
+  description = "List of nodes with name and networks"
   type = list(object({
-    name      = string
-    local_ip  = optional(string)
-    bridge_ip = optional(string)
+    name = string
+    networks = optional(list(object({
+      profile_name = string
+      ip           = optional(string)
+    })), [])
   }))
 }

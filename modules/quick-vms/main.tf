@@ -7,32 +7,51 @@ terraform {
   }
 }
 
-module "local_network_profile_reader" {
-  count             = var.local-kvm-network-name != null ? 1 : 0
-  source      = "../quick-kvm-network-reader"
-  kvm_network_name = var.local-kvm-network-name
+//-------------------------------------------------------------------------------
+// Read network profiles for enabled networks without manual profile
+//-------------------------------------------------------------------------------
+
+locals {
+  enabled_kvm_networks = {
+    for name, net in var.kvm-networks : name => net if net.enabled
+  }
+
+  networks_needing_reader = {
+    for name, net in local.enabled_kvm_networks : name => name
+    if net.profile == null
+  }
 }
 
-module "bridge_network_profile_reader" {
-  count             = var.bridge-kvm-network-name != null ? 1 : 0
-  source      = "../quick-kvm-network-reader"
-  kvm_network_name = var.bridge-kvm-network-name
+module "network_profile_reader" {
+  for_each         = local.networks_needing_reader
+  source           = "../quick-kvm-network-reader"
+  kvm_network_name = each.value
 }
 
 locals {
+  # Resolved profiles: manual profile > reader
+  resolved_network_profiles = {
+    for name, net in local.enabled_kvm_networks : name => (
+      net.profile != null ? {
+        kvm_network_name = try(net.profile.kvm_network_name, name)
+        dhcp_mode        = try(net.profile.dhcp_mode, "static")
+        gateway4         = net.profile.gateway4
+        mask             = net.profile.mask
+        nameservers      = net.profile.nameservers
+        bridge           = try(net.profile.bridge, null)
+        mode             = null
+        error            = ""
+      } : module.network_profile_reader[name].profile
+    )
+  }
+}
+
+//-------------------------------------------------------------------------------
+// User data
+//-------------------------------------------------------------------------------
+
+locals {
   machines = var.machines
-
-  local_network_profile_static = (
-    var.local-kvm-network-name != null && length(module.local_network_profile_reader) > 0
-    ? module.local_network_profile_reader[0].profile
-    : null
-  )
-
-  bridge_network_profile_static = (
-    var.bridge-kvm-network-name != null && length(module.bridge_network_profile_reader) > 0
-    ? module.bridge_network_profile_reader[0].profile
-    : null
-  )
 
   user_data_map = {
     for set_key, set_val in var.machines :
@@ -42,56 +61,63 @@ locals {
       : (
       set_val.cloud_init_user_data_path != null
       ? templatefile("${path.root}/${set_val.cloud_init_user_data_path}", {
-      user_name     = set_val.user.name,
-      user_password = set_val.user.password
-    })
+        user_name     = set_val.user.name,
+        user_password = set_val.user.password
+      })
       : file("ERROR: Both cloud_init_user_data_template and cloud_init_user_data_path are null for set '${set_key}'")
-    )
+      )
     )
   }
 }
-#--------------------- for debug only -------------------
-# locals {
-#   ma = merge([
-#     for set_key, set_val in var.machines :
-#     {
-#       for node in set_val.nodes :
-#       "${set_key}-${node.name}" => {
-#       set_key    = set_key
-#       set_name   = set_val.set_name
-#       vm_profile = set_val.vm_profile
-#       main_storage = set_val.main_storage
-#       user_data  = local.user_data_map[set_key]
-#       node       = node
-#
-#
-#     }
-#     }
-#   ]...)
-# }
-#
-# resource "null_resource" "debug" {
-#   triggers = {
-#     always_run = timestamp()
-#   }
-#   lifecycle {
-#     precondition {
-#       condition = local.machines == null
-#       error_message = "machines=${jsonencode(local.ma)}"
-#     }
-#   }
-# }
-#--------------------------------------------------------
 
-output "local-network-profile" {
-  value = local.local_network_profile_static
-  description = "local network profile"
+//-------------------------------------------------------------------------------
+// Outputs
+//-------------------------------------------------------------------------------
+
+output "kvm-network-profiles" {
+  value       = local.resolved_network_profiles
+  description = "Resolved network profiles"
 }
 
-output "bridge-network-profile" {
-  value = local.bridge_network_profile_static
-  description = "bridge network profile"
+//-------------------------------------------------------------------------------
+// Validate: all networks referenced by nodes must exist in kvm-networks
+//-------------------------------------------------------------------------------
+
+locals {
+  _all_referenced_networks = distinct(flatten([
+    for set_key, set_val in var.machines : [
+      for node in set_val.nodes : [
+        for net in node.networks : net.profile_name
+      ]
+    ]
+  ]))
+
+  _missing_networks = [
+    for net_name in local._all_referenced_networks : net_name
+    if !contains(keys(var.kvm-networks), net_name)
+  ]
 }
+
+resource "null_resource" "validate_kvm_networks" {
+  lifecycle {
+    precondition {
+      condition     = length(local._missing_networks) == 0
+      error_message = <<-EOT
+        The following networks are used in node definitions but not declared in kvm-networks:
+          ${join(", ", local._missing_networks)}
+
+        Add them to kvm-networks, for example:
+          kvm-networks = {
+            ${join("\n    ", [for n in local._missing_networks : "\"${n}\" = { enabled = true }"])}
+          }
+      EOT
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------
+// VMs
+//-------------------------------------------------------------------------------
 
 module "vms" {
   for_each = merge([
@@ -99,60 +125,48 @@ module "vms" {
     {
       for node in set_val.nodes :
       "${set_key}-${node.name}" => {
-      set_key    = set_key
-      set_name   = set_val.set_name
-      vm_profile = set_val.vm_profile
-      main_storage = set_val.main_storage
-      user_data  = local.user_data_map[set_key]
-      node       = node
-
-
-    }
+        set_key      = set_key
+        set_name     = set_val.set_name
+        vm_profile   = set_val.vm_profile
+        main_storage = set_val.main_storage
+        user_data    = local.user_data_map[set_key]
+        node         = node
+      }
     }
   ]...)
 
-  source      = "../quick-vm"
-  name        = "${each.value.set_name}-${each.value.node.name}"
-  description = each.value.node.description
-  user_data   = each.value.user_data
-  vm_profile  = each.value.vm_profile
+  source       = "../quick-vm"
+  name         = "${each.value.set_name}-${each.value.node.name}"
+  description  = each.value.node.description
+  user_data    = each.value.user_data
+  vm_profile   = each.value.vm_profile
   main_storage = each.value.main_storage
 
-  local_network = (
-    each.value.node.local_ip != null && local.local_network_profile_static != null ? {
-    is_enabled = true
-    ip         = each.value.node.local_ip
-    profile    = local.local_network_profile_static
-  } : {
-    is_enabled = false
-    ip         = null
-    profile    = null
-  }
-  )
-
-  bridge_network = (
-    each.value.node.bridge_ip != null && local.bridge_network_profile_static != null ? {
-    is_enabled = true
-    ip         = each.value.node.bridge_ip
-    profile    = local.bridge_network_profile_static
-  } : {
-    is_enabled = false
-    ip         = null
-    profile    = null
-  }
-  )
+  networks = [
+    for net in each.value.node.networks : {
+      profile_name = net.profile_name
+      profile      = try(local.resolved_network_profiles[net.profile_name], null)
+      ip           = net.ip
+      enabled      = contains(keys(local.enabled_kvm_networks), net.profile_name)
+    }
+  ]
 }
 
+//-------------------------------------------------------------------------------
+// SSH config & hosts generators
+//-------------------------------------------------------------------------------
+
 module "quick-ssh-config-generator" {
-    for_each    = local.machines
-    source = "../quick-ssh-config"
-    set_name = each.value.set_name
-    nodes = each.value.nodes
+  for_each = local.machines
+  source   = "../quick-ssh-config"
+  set_name = each.value.set_name
+  user     = each.value.user.name
+  nodes    = each.value.nodes
 }
 
 module "quick-hosts-generator" {
-    for_each    = local.machines
-    source = "../quick-hosts"
-    set_name = each.value.set_name
-    nodes = each.value.nodes
+  for_each = local.machines
+  source   = "../quick-hosts"
+  set_name = each.value.set_name
+  nodes    = each.value.nodes
 }

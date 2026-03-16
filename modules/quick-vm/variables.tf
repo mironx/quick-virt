@@ -44,57 +44,32 @@ variable "main_storage" {
   default = null
 }
 
-
 variable "vm_profile" {
   type = object({
     image_source = optional(string)
     vcpu         = number
     memory       = number
-    network_desc_order = optional(bool)
-    cpu =  optional(object({
+    cpu = optional(object({
        mode = optional(string)
     }))
   })
 }
 
-variable "local_network" {
-  type = object({
-    ip = optional(string)
-    is_enabled = optional(bool)
+variable "networks" {
+  description = "List of networks to attach to the VM. Order determines interface order (index 0 = enp0s3, index 1 = enp0s4, etc.)"
+  type = list(object({
     profile_name = optional(string)
     profile = optional(object({
       kvm_network_name = optional(string)
-      dhcp_mode = optional(string)
-      mask      = optional(string)
-      gateway4  = optional(string)
-      nameservers = optional(list(string))
-      error = optional(string, "")
+      dhcp_mode        = optional(string, "static")
+      gateway4         = string
+      mask             = string
+      nameservers      = list(string)
+      bridge           = optional(string)
+      error            = optional(string, "")
     }))
-  })
-  default = {
-    ip = null
-    is_enabled = false
-  }
-}
-
-
-variable "bridge_network" {
-   type = object({
-    ip = optional(string)
-    is_enabled = optional(bool)
-    profile_name = optional(string)
-    profile = optional(object({
-      kvm_network_name = optional(string)
-      dhcp_mode = optional(string)
-      mask      = optional(string)
-      gateway4  = optional(string)
-      nameservers = optional(list(string))
-      bridge = string
-      error = optional(string, "")
-    }))
-  })
-  default = {
-    ip = null
-    is_enabled = false
-  }
+    ip      = optional(string)
+    enabled = optional(bool, true)
+  }))
+  default = []
 }
