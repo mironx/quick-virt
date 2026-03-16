@@ -16,10 +16,12 @@ variable "identity_file" {
 }
 
 variable "nodes" {
-  description = "List of nodes with name, local_ip, and bridge_ip"
+  description = "List of nodes with name and networks"
   type = list(object({
-    name      = string
-    local_ip  = optional(string)
-    bridge_ip = optional(string)
+    name = string
+    networks = optional(list(object({
+      profile_name = string
+      ip           = optional(string)
+    })), [])
   }))
 }

@@ -12,32 +12,19 @@ resource "local_file" "ssh_config" {
     "#--------------------------------------------------- ${local.set_name}",
 
     [
-      for node in local.nodes : (
-        (node.local_ip != null && node.local_ip != "") || (node.bridge_ip != null && node.bridge_ip != "") ?
-        join("\n", compact([
-          node.local_ip != null && node.local_ip != "" ? trimspace(<<-EOT
-Host ${local.set_name}-${node.name}
-  HostName ${node.local_ip}
+      for node in local.nodes : [
+        for idx, net in node.networks :
+        net.ip != null && net.ip != "" ? trimspace(<<-EOT
+Host ${local.set_name}-${node.name}${idx == 0 ? "" : "-${net.profile_name}"}
+  HostName ${net.ip}
   User devx
   IdentityFile ${local.identity_file}
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
   LogLevel ERROR
 EOT
-          ) : null,
-
-          node.bridge_ip != null && node.bridge_ip != "" ? trimspace(<<-EOT
-Host ${local.set_name}-${node.name}-viabridge
-  HostName ${node.bridge_ip}
-  User devx
-  IdentityFile ${local.identity_file}
-  StrictHostKeyChecking no
-  UserKnownHostsFile /dev/null
-  LogLevel ERROR
-EOT
-          ) : null
-        ])) : null
-      )
+        ) : null
+      ]
     ],
 
     "#--------------------------------------------------- ${local.set_name}"

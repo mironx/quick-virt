@@ -17,68 +17,32 @@ resource "null_resource" "validate_vm" {
       condition     = local.current_vm_profile.image_source != null && local.current_vm_profile.image_source != ""
       error_message = "VM image_source must be defined and not empty [vm_name:${var.name}]"
     }
-
-    precondition {
-      condition     = local.current_vm_profile.network_desc_order != null
-      error_message = "VM network_desc_order must be defined (even if false) [vm_name:${var.name}]"
-    }
   }
   depends_on = [null_resource.validate]
 }
 
-# Validate local_network
-#--------------------------------------------------------------------------------------------------------
-resource "null_resource" "validate_local_network" {
+resource "null_resource" "validate_networks" {
+  for_each = { for idx, n in local.resolved_networks : tostring(idx) => n }
+
   lifecycle {
     precondition {
-      condition     = !(local.current_local_network.is_enabled && try(local.resolved_local_network_profile.error, "") != "")
-      error_message = "VM '${var.name}' wants to use local network '${try(local.resolved_local_network_profile.kvm_network_name, "unknown")}', but there is a problem with this network: ${try(local.resolved_local_network_profile.error, "")}"
+      condition     = each.value.profile != null
+      error_message = "Network ${each.key} (profile_name: ${try(each.value.profile_name, "none")}) has no profile. Provide profile_name or profile. [vm_name:${var.name}]"
     }
 
     precondition {
-      condition     = !(local.current_local_network.is_enabled && local.current_local_network.profile == null)
-      error_message = "local_network.profile must be set when is_enabled is true [vm_name:${var.name}]"
+      condition     = try(each.value.profile.error, "") == ""
+      error_message = "Network ${each.key} (${try(each.value.profile_name, "unknown")}) has an error: ${try(each.value.profile.error, "")} [vm_name:${var.name}]"
     }
 
     precondition {
-      condition     = local.current_local_network.profile.dhcp_mode != "static" || (
-        local.current_local_network.ip != null && local.current_local_network.ip != "" &&
-        local.current_local_network.profile.mask != null && local.current_local_network.profile.mask != "" &&
-        local.current_local_network.profile.gateway4 != null && local.current_local_network.profile.gateway4 != "" &&
-        local.current_local_network.profile.nameservers != null &&
-        length(local.current_local_network.profile.nameservers) > 0
+      condition = try(each.value.profile.dhcp_mode, "static") == "dhcp" || (
+        each.value.ip != null && each.value.ip != "" &&
+        try(each.value.profile.mask, "") != "" &&
+        try(each.value.profile.gateway4, "") != "" &&
+        try(each.value.profile.nameservers, []) != []
       )
-      error_message = "local_network is in static mode but required fields (ip, mask, gateway4, nameservers) are missing [vm_name:${var.name}]"
-    }
-  }
-  depends_on = [null_resource.validate]
-}
-
-
-# Validate bridge_network
-#--------------------------------------------------------------------------------------------------------
-resource "null_resource" "validate_bridge_network" {
-  lifecycle {
-    precondition {
-      condition     = !(local.current_bridge_network.is_enabled && try(local.resolved_bridge_network_profile.error, "") != "")
-      error_message = "VM '${var.name}' wants to use bridge network '${try(local.resolved_bridge_network_profile.kvm_network_name, "unknown")}', but there is a problem with this network: ${try(local.resolved_bridge_network_profile.error, "")}"
-    }
-
-    precondition {
-      condition     = !(local.current_bridge_network.is_enabled && local.current_bridge_network.profile == null)
-      error_message = "bridge_network.profile must be set when is_enabled is true [vm_name:${var.name}]"
-    }
-
-    precondition {
-      condition     = local.current_bridge_network.profile.dhcp_mode != "static" || (
-        local.current_bridge_network.ip != null && local.current_bridge_network.ip != "" &&
-        local.current_bridge_network.profile.mask != null && local.current_bridge_network.profile.mask != "" &&
-        local.current_bridge_network.profile.gateway4 != null && local.current_bridge_network.profile.gateway4 != "" &&
-        local.current_bridge_network.profile.bridge != null && local.current_bridge_network.profile.bridge != "" &&
-        local.current_bridge_network.profile.nameservers != null &&
-        length(local.current_bridge_network.profile.nameservers) > 0
-      )
-      error_message = "bridge_network is in static mode but required fields (ip, mask, gateway4, nameservers) are missing [vm_name:${var.name}]"
+      error_message = "Network ${each.key} is static but missing required fields (ip, mask, gateway4, nameservers) [vm_name:${var.name}]"
     }
   }
   depends_on = [null_resource.validate]

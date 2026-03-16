@@ -11,148 +11,113 @@ provider "libvirt" {
 }
 
 locals {
-  use_network_local  = true
-  use_network_bridge = true
-}
-
-module "local_network_profile_reader" {
-  count            = local.use_network_local ? 1 : 0
-  source           = "../../modules/quick-kvm-network-reader"
-  kvm_network_name = "qvexample-neta-loc-1"
-}
-
-module "bridge_network_profile_reader" {
-  count            = local.use_network_bridge ? 1 : 0
-  source           = "../../modules/quick-kvm-network-reader"
-  kvm_network_name = "qvexample-net-bridge"
-}
-
-locals {
   vm_profile = var.vm_profile
-
-  local_network_profile_static  = local.use_network_local ? module.local_network_profile_reader[0].profile : null
-  bridge_network_profile_static = local.use_network_bridge ? module.bridge_network_profile_reader[0].profile : null
-
-  local_network_profile_dhcp = local.use_network_local ? {
-    kvm_network_name = local.local_network_profile_static.kvm_network_name
-    dhcp_mode  = "dhcp"
-  } : null
-
-  bridge_network_profile_dhcp = local.use_network_bridge ? {
-    kvm_network_name = local.bridge_network_profile_static.kvm_network_name
-    dhcp_mode  = "dhcp"
-    bridge = local.bridge_network_profile_static.bridge
-  } : null
-
-  user = var.user
+  user       = var.user
 }
 
 locals {
   user_data = templatefile("${path.module}/templates/user-data.tmpl", {
     user_name     = local.user.name
-    user_password  = local.user.password
+    user_password = local.user.password
   })
 }
 
-
+# vm1: static IP on both networks, custom storage
 module "vm1" {
-  source = "../../modules/quick-vm"
-  name = "vt1_static_local_network"
-  user_data = local.user_data
+  source     = "../../modules/quick-vm"
+  name       = "vt1_static_both"
+  user_data  = local.user_data
   vm_profile = local.vm_profile
   main_storage = {
     size = 40
   }
-  local_network = {
-    is_enabled = local.use_network_local
-    ip         = local.use_network_local ? "192.168.200.16" : null
-    profile    = local.local_network_profile_static
-  }
-  bridge_network = {
-    is_enabled = local.use_network_bridge
-    ip         = local.use_network_bridge ? "172.16.0.16" : null
-    profile    = local.bridge_network_profile_static
-  }
+  networks = [
+    { profile_name = "qvexample-neta-loc-1", ip = "192.168.200.16" },
+    { profile_name = "qvexample-net-bridge", ip = "172.16.0.16" }
+  ]
 }
 
+# vm2: DHCP on both networks
 module "vm2" {
-  source = "../../modules/quick-vm"
-  name = "vt2_dhcp_local_network"
-  user_data = local.user_data
+  source     = "../../modules/quick-vm"
+  name       = "vt2_dhcp_both"
+  user_data  = local.user_data
   vm_profile = local.vm_profile
-  local_network = {
-    is_enabled = local.use_network_local
-    profile    = local.local_network_profile_dhcp
-  }
-  bridge_network = {
-    is_enabled = local.use_network_bridge
-    profile    = local.bridge_network_profile_dhcp
-  }
+  networks = [
+    { profile_name = "qvexample-neta-loc-1", profile = { dhcp_mode = "dhcp", gateway4 = "", mask = "", nameservers = [], kvm_network_name = "qvexample-neta-loc-1" } },
+    { profile_name = "qvexample-net-bridge", profile = { dhcp_mode = "dhcp", gateway4 = "", mask = "", nameservers = [], bridge = "br0", kvm_network_name = "qvexample-net-bridge" } }
+  ]
 }
 
+# vm3: DHCP local only
 module "vm3" {
-  source = "../../modules/quick-vm"
-  name = "vt3_dhcp_local_a"
-  user_data = local.user_data
+  source     = "../../modules/quick-vm"
+  name       = "vt3_dhcp_local_only"
+  user_data  = local.user_data
   vm_profile = local.vm_profile
-  local_network = {
-    is_enabled = local.use_network_local
-    profile    = local.local_network_profile_dhcp
-  }
-  bridge_network = {
-    is_enabled = false
-  }
+  networks = [
+    { profile_name = "qvexample-neta-loc-1", profile = { dhcp_mode = "dhcp", gateway4 = "", mask = "", nameservers = [], kvm_network_name = "qvexample-neta-loc-1" } }
+  ]
 }
 
+# vm4: DHCP bridge only
 module "vm4" {
-  source = "../../modules/quick-vm"
-  name = "vt4_dhcp_bridge_a"
+  source     = "../../modules/quick-vm"
+  name       = "vt4_dhcp_bridge_only"
+  user_data  = local.user_data
   vm_profile = local.vm_profile
-  user_data = local.user_data
-  local_network = {
-    is_enabled = false
-  }
-  bridge_network = {
-    is_enabled = local.use_network_bridge
-    profile    = local.bridge_network_profile_dhcp
-  }
+  networks = [
+    { profile_name = "qvexample-net-bridge", profile = { dhcp_mode = "dhcp", gateway4 = "", mask = "", nameservers = [], bridge = "br0", kvm_network_name = "qvexample-net-bridge" } }
+  ]
 }
 
+# vm5: DHCP local only
 module "vm5" {
-  source = "../../modules/quick-vm"
-  name = "vt5_dhcp_local_b"
-  user_data = local.user_data
+  source     = "../../modules/quick-vm"
+  name       = "vt5_dhcp_local_b"
+  user_data  = local.user_data
   vm_profile = local.vm_profile
-  local_network = {
-    is_enabled = local.use_network_local
-    profile    = local.local_network_profile_dhcp
-  }
+  networks = [
+    { profile_name = "qvexample-neta-loc-1", profile = { dhcp_mode = "dhcp", gateway4 = "", mask = "", nameservers = [], kvm_network_name = "qvexample-neta-loc-1" } }
+  ]
 }
 
+# vm6: DHCP bridge only
 module "vm6" {
-  source = "../../modules/quick-vm"
-  name = "vt6_dhcp_bridge_b"
-  user_data = local.user_data
+  source     = "../../modules/quick-vm"
+  name       = "vt6_dhcp_bridge_b"
+  user_data  = local.user_data
   vm_profile = local.vm_profile
-  bridge_network = {
-    is_enabled = local.use_network_bridge
-    profile    = local.bridge_network_profile_dhcp
-  }
+  networks = [
+    { profile_name = "qvexample-net-bridge", profile = { dhcp_mode = "dhcp", gateway4 = "", mask = "", nameservers = [], bridge = "br0", kvm_network_name = "qvexample-net-bridge" } }
+  ]
 }
 
+# vm7: static IP using profile_name (reader auto-detects)
 module "vm7" {
-  source = "../../modules/quick-vm"
-  name = "vt7_profile_name"
-  user_data = local.user_data
+  source     = "../../modules/quick-vm"
+  name       = "vt7_profile_name"
+  user_data  = local.user_data
   vm_profile = local.vm_profile
-  local_network = {
-    is_enabled   = local.use_network_local
-    ip           = "192.168.200.20"
-    profile_name = "qvexample-neta-loc-1"
-  }
-  bridge_network = {
-    is_enabled   = local.use_network_bridge
-    ip           = "172.16.0.20"
-    profile_name = "qvexample-net-bridge"
+  networks = [
+    { profile_name = "qvexample-neta-loc-1", ip = "192.168.200.20" },
+    { profile_name = "qvexample-net-bridge", ip = "172.16.0.20" }
+  ]
+}
+
+output "vms" {
+  value = {
+    for name, mod in {
+      vm1 = module.vm1
+      vm2 = module.vm2
+      vm3 = module.vm3
+      vm4 = module.vm4
+      vm5 = module.vm5
+      vm6 = module.vm6
+      vm7 = module.vm7
+    } : name => {
+      name     = mod.vm_name
+      networks = mod.vm_networks
+    }
   }
 }
