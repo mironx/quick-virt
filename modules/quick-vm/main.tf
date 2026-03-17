@@ -345,6 +345,12 @@ resource "libvirt_domain" "vm" {
   memory_unit = "MiB"
   vcpu        = local.current_vm_profile.vcpu
 
+  memory_backing = length(var.shared_folders) > 0 ? {
+    memory_access = {
+      mode = "shared"
+    }
+  } : null
+
   os = {
     type = "hvm"
     boot = [{
@@ -424,6 +430,24 @@ resource "libvirt_domain" "vm" {
         }
       }
     ] : []
+
+    filesystems = [
+      for f in var.shared_folders : {
+        source = {
+          mount = {
+            dir = f.source
+          }
+        }
+        target = {
+          dir = f.target
+        }
+        read_only   = f.read_only
+        access_mode = "mapped"
+        driver = {
+          type = "path"
+        }
+      }
+    ]
   }
 
   running     = local.running

@@ -55,6 +55,12 @@ variable "machines" {
     os_image_mode = optional(string, "local")
     os_disk_mode  = optional(string, "backing_store")
 
+    shared_folders = optional(list(object({
+      source    = string
+      target    = string
+      read_only = optional(bool, false)
+    })), [])
+
     nodes = list(object({
       name        = string
       description = optional(string)

@@ -32,6 +32,7 @@ module "ubuntu_22_test" {
   kvm_networks = local.kvm_networks
   vm_profile   = local.vm_profile
   user_data    = local.user_data
+  vmdata_path  = "${abspath(path.module)}/vmdata"
 }
 
 module "ubuntu_24_test" {
@@ -40,6 +41,7 @@ module "ubuntu_24_test" {
   kvm_networks = local.kvm_networks
   vm_profile   = local.vm_profile
   user_data    = local.user_data
+  vmdata_path  = "${abspath(path.module)}/vmdata"
 }
 
 module "rocky_9_test" {
@@ -48,6 +50,7 @@ module "rocky_9_test" {
   kvm_networks = local.kvm_networks
   vm_profile   = local.vm_profile
   user_data    = local.user_data
+  vmdata_path  = "${abspath(path.module)}/vmdata"
 }
 
 module "debian_12_test" {
@@ -56,6 +59,7 @@ module "debian_12_test" {
   kvm_networks = local.kvm_networks
   vm_profile   = local.vm_profile
   user_data    = local.user_data
+  vmdata_path  = "${abspath(path.module)}/vmdata"
 }
 
 output "ubuntu_22" {

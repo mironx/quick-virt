@@ -39,3 +39,6 @@ terraform.rc
 
 .idea
 *.qv-info
+
+# VM shared data files (created by VMs at runtime)
+vmdata/*.txt

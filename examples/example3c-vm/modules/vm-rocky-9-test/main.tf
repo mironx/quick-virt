@@ -115,3 +115,41 @@ module "vm_E" {
     { profile_name = "qvexample-net-bridge", ip = "172.16.0.77" }
   ]
 }
+
+# ==============================================================================
+# F1, F2 — shared folder mounted from host
+# ==============================================================================
+
+module "vm_F1" {
+  source       = "../../../../modules/quick-vm"
+  name         = "${var.prefix}-rocky9-F1"
+  os_volume    = module.base_rocky_9.volume
+  os_disk_mode = "backing_store"
+  user_data    = var.user_data
+  vm_profile   = var.vm_profile
+  kvm-networks = var.kvm_networks
+  shared_folders = [
+    { source = var.vmdata_path, target = "vmdata" }
+  ]
+  networks = [
+    { profile_name = "qvexample-neta-loc-1", ip = "192.168.200.44" },
+    { profile_name = "qvexample-net-bridge", ip = "172.16.0.44" }
+  ]
+}
+
+module "vm_F2" {
+  source       = "../../../../modules/quick-vm"
+  name         = "${var.prefix}-rocky9-F2"
+  os_volume    = module.base_rocky_9.volume
+  os_disk_mode = "backing_store"
+  user_data    = var.user_data
+  vm_profile   = var.vm_profile
+  kvm-networks = var.kvm_networks
+  shared_folders = [
+    { source = var.vmdata_path, target = "vmdata" }
+  ]
+  networks = [
+    { profile_name = "qvexample-neta-loc-1", ip = "192.168.200.45" },
+    { profile_name = "qvexample-net-bridge", ip = "172.16.0.45" }
+  ]
+}

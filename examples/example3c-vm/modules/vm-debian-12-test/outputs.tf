@@ -6,7 +6,9 @@ output "vms" {
       C = module.vm_C
       # D1 = module.vm_D1  # clone not supported
       # D2 = module.vm_D2  # clone not supported
-      E = module.vm_E
+      E  = module.vm_E
+      F1 = module.vm_F1
+      F2 = module.vm_F2
     } : name => {
       name       = mod.vm_name
       networks   = mod.vm_networks

@@ -146,3 +146,13 @@ variable "networks" {
   }))
   default = []
 }
+
+variable "shared_folders" {
+  description = "List of host directories to mount in the VM via 9p/virtio"
+  type = list(object({
+    source    = string
+    target    = string
+    read_only = optional(bool, false)
+  }))
+  default = []
+}

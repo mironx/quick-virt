@@ -73,3 +73,21 @@ resource "null_resource" "validate_networks" {
   }
   depends_on = [null_resource.validate]
 }
+
+resource "null_resource" "validate_shared_folders" {
+  for_each = { for idx, f in var.shared_folders : tostring(idx) => f }
+
+  lifecycle {
+    precondition {
+      condition     = length(fileset(each.value.source, "*")) >= 0
+      error_message = <<-EOT
+        Shared folder source directory not found: ${each.value.source}
+        [vm_name:${var.name}, target:${each.value.target}]
+
+        Create it first:
+          mkdir -p ${each.value.source}
+      EOT
+    }
+  }
+  depends_on = [null_resource.validate]
+}

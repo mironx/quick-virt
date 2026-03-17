@@ -24,6 +24,11 @@ variable "user_data" {
   type = string
 }
 
+variable "vmdata_path" {
+  description = "Absolute path to shared vmdata directory"
+  type        = string
+}
+
 variable "test_clone_exception" {
   description = "Set to true to test clone validation error (disk_mode 'clone' is not supported)"
   type        = bool
