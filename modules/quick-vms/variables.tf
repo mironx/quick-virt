@@ -43,6 +43,7 @@ variable "machines" {
         network_template = string
         interface_naming = string
         interface_offset = number
+        fs_type          = string
       })
     }))
     os_name    = optional(string)
@@ -51,9 +52,11 @@ variable "machines" {
       network_template = optional(string, "netplan")
       interface_naming = optional(string, "enp0s")
       interface_offset = optional(number, 3)
+      fs_type          = optional(string, "virtiofs")
     }))
     os_image_mode = optional(string, "local")
     os_disk_mode  = optional(string, "backing_store")
+    fs_type       = optional(string)
 
     memory_backing = optional(object({
       shared       = optional(bool, true)

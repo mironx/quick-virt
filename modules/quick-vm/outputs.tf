@@ -32,10 +32,11 @@ output "vm_os_profile" {
   value = {
     os_name          = coalesce(var.os_name, "ubuntu_22")
     image            = local.selected_os.image
-    os_image_mode       = var.os_image_mode
-    os_disk_mode        = var.os_disk_mode
+    os_image_mode    = var.os_image_mode
+    os_disk_mode     = var.os_disk_mode
     network_template = local.selected_os.network_template
     interface_naming = local.selected_os.interface_naming
+    fs_type          = local.fs_type
   }
   description = "Resolved OS profile for the VM"
 }
@@ -46,4 +47,17 @@ output "vm_profile" {
     memory = local.current_vm_profile.memory
   }
   description = "VM compute profile"
+}
+
+output "vm_shared_folders" {
+  value = [
+    for f in var.shared_folders : {
+      source    = f.source
+      target    = f.target
+      read_only = f.read_only
+      mount     = "/mnt/${f.target}"
+      fs_type   = local.fs_type
+    }
+  ]
+  description = "Shared folders configuration with resolved fs_type"
 }

@@ -78,6 +78,7 @@ variable "os_volume" {
       network_template = string
       interface_naming = string
       interface_offset = number
+      fs_type          = string
     })
   })
   default = null
@@ -100,6 +101,7 @@ variable "os_profile" {
     network_template = optional(string, "netplan")
     interface_naming = optional(string, "enp0s")
     interface_offset = optional(number, 3)
+    fs_type          = optional(string, "virtiofs")
   })
   default = null
 }
@@ -111,6 +113,16 @@ variable "os_image_mode" {
   validation {
     condition     = contains(["local", "url"], var.os_image_mode)
     error_message = "os_image_mode must be 'local' or 'url'"
+  }
+}
+
+variable "fs_type" {
+  description = "Filesystem type for shared folders: 'virtiofs' or '9p'. Overrides os_profile.fs_type if set."
+  type        = string
+  default     = "virtiofs"
+  validation {
+    condition     = var.fs_type == null || contains(["virtiofs", "9p"], var.fs_type)
+    error_message = "fs_type must be 'virtiofs' or '9p'"
   }
 }
 

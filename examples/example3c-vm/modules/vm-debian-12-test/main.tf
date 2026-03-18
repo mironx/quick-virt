@@ -141,7 +141,8 @@ module "vm_F2" {
   source       = "../../../../modules/quick-vm"
   name         = "${var.prefix}-debian12-F2"
   os_volume    = module.base_debian_12.volume
-  os_disk_mode = "backing_store"
+  os_disk_mode    = "backing_store"
+  fs_type         = "9p"
   user_data    = var.user_data
   vm_profile   = var.vm_profile
   kvm-networks = var.kvm_networks
