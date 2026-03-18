@@ -13,11 +13,11 @@ tasks:
 
   setup:enable-shared-folders:
     desc: Allow libvirt-qemu to access current user's files (for shared folders / 9p)
-    cmd: sudo usermod -aG $(whoami) libvirt-qemu && echo "[ok] libvirt-qemu added to group $(whoami). Restart libvirtd: sudo systemctl restart libvirtd"
+    cmd: 'sudo usermod -aG $(whoami) libvirt-qemu && echo "libvirt-qemu added to group $(whoami). Restart libvirtd: sudo systemctl restart libvirtd"'
 
   setup:disable-shared-folders:
     desc: Remove libvirt-qemu from current user's group
-    cmd: sudo gpasswd -d libvirt-qemu $(whoami) && echo "[ok] libvirt-qemu removed from group $(whoami). Restart libvirtd: sudo systemctl restart libvirtd"
+    cmd: 'sudo gpasswd -d libvirt-qemu $(whoami) && echo "libvirt-qemu removed from group $(whoami). Restart libvirtd: sudo systemctl restart libvirtd"'
 
   setup:enable-shared-folders-for:
     desc: Allow libvirt-qemu to access a specific user's files (requires USER=<username>)
@@ -30,6 +30,14 @@ tasks:
     cmd: sudo gpasswd -d libvirt-qemu {{.USER}} && echo "[ok] libvirt-qemu removed from group {{.USER}}. Restart libvirtd{{":"}} sudo systemctl restart libvirtd"
     requires:
       vars: [USER]
+
+  setup:install-virtiofsd:
+    desc: Install virtiofsd daemon (required for virtiofs shared folders)
+    cmd: '{{.SCRIPTS_DIR}}/tools/check-shared-folders-drivers.sh install'
+
+  setup:check-shared-folders-drivers:
+    desc: Check virtiofs and 9p driver availability on the host
+    cmd: '{{.SCRIPTS_DIR}}/tools/check-shared-folders-drivers.sh'
 
   # ---------------------------------------------------------------------------
   # Linux Bridge
