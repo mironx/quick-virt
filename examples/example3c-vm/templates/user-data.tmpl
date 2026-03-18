@@ -18,6 +18,3 @@ packages:
 
 runcmd:
   - systemctl enable --now qemu-guest-agent
-  - mkdir -p /mnt/vmdata
-  - mount -t 9p -o trans=virtio vmdata /mnt/vmdata || true
-  - echo "ready" > /mnt/vmdata/$(hostname).txt || true

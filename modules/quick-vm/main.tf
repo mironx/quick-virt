@@ -188,7 +188,38 @@ locals {
     }
   )
 
-  user_data = replace(var.user_data, "HOST_NAME", var.name)
+  _base_user_data = replace(var.user_data, "HOST_NAME", var.name)
+
+  # Filesystem type: virtiofs for Rocky/RHEL (no 9p kernel module), 9p for Ubuntu/Debian
+  fs_type = local.selected_os.network_template == "networkmanager" ? "virtiofs" : "9p"
+
+  _shared_folders_cloud_config = length(var.shared_folders) > 0 ? templatefile(
+    "${path.module}/templates/cloud-config-shared-folders.tmpl", {
+      shared_folders = var.shared_folders
+      fs_type        = local.fs_type
+    }
+  ) : ""
+
+  # When shared_folders exist, combine user_data with shared folders config via multipart MIME
+  # Cloud-init merges packages and runcmd from both parts automatically
+  user_data = length(var.shared_folders) > 0 ? join("\n", [
+    "Content-Type: multipart/mixed; boundary=\"MIMEBOUNDARY\"",
+    "MIME-Version: 1.0",
+    "",
+    "--MIMEBOUNDARY",
+    "Content-Type: text/cloud-config; charset=\"us-ascii\"",
+    "Content-Disposition: attachment; filename=\"base.cfg\"",
+    "",
+    local._base_user_data,
+    "",
+    "--MIMEBOUNDARY",
+    "Content-Type: text/cloud-config; charset=\"us-ascii\"",
+    "Content-Disposition: attachment; filename=\"shared-folders.cfg\"",
+    "",
+    local._shared_folders_cloud_config,
+    "",
+    "--MIMEBOUNDARY--",
+  ]) : local._base_user_data
 
   meta_data = templatefile("${path.module}/templates/meta-data.tmpl", {
     instance_id    = var.name
@@ -453,9 +484,9 @@ resource "libvirt_domain" "vm" {
           dir = f.target
         }
         read_only   = f.read_only
-        access_mode = "mapped"
+        access_mode = local.fs_type == "virtiofs" ? "passthrough" : "mapped"
         driver = {
-          type = "path"
+          type = local.fs_type == "virtiofs" ? "virtiofs" : "path"
         }
       }
     ]

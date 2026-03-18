@@ -1,0 +1,24 @@
+#cloud-config
+merge_how:
+ - name: list
+   settings: [append]
+ - name: dict
+   settings: [no_replace, recurse_list]
+
+runcmd:
+%{ if length(shared_folders) > 0 ~}
+%{ if fs_type == "virtiofs" ~}
+  - modprobe virtiofs || true
+%{ else ~}
+  - modprobe 9p || true
+  - modprobe 9pnet_virtio || true
+%{ endif ~}
+%{ endif ~}
+%{ for f in shared_folders ~}
+  - mkdir -p /mnt/${f.target}
+%{ if fs_type == "virtiofs" ~}
+  - mount -t virtiofs ${f.target} /mnt/${f.target} || true
+%{ else ~}
+  - mount -t 9p -o trans=virtio,version=9p2000.L ${f.target} /mnt/${f.target} || true
+%{ endif ~}
+%{ endfor ~}

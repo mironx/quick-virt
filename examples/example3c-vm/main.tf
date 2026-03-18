@@ -28,7 +28,7 @@ locals {
 
 module "ubuntu_22_test" {
   source       = "./modules/vm-ubuntu-22-test"
-  prefix       = "${local.prefix}-ubuntu22"
+  prefix       = local.prefix
   kvm_networks = local.kvm_networks
   vm_profile   = local.vm_profile
   user_data    = local.user_data
@@ -37,7 +37,7 @@ module "ubuntu_22_test" {
 
 module "ubuntu_24_test" {
   source       = "./modules/vm-ubuntu-24-test"
-  prefix       = "${local.prefix}-ubuntu24"
+  prefix       = local.prefix
   kvm_networks = local.kvm_networks
   vm_profile   = local.vm_profile
   user_data    = local.user_data
@@ -46,7 +46,7 @@ module "ubuntu_24_test" {
 
 module "rocky_9_test" {
   source       = "./modules/vm-rocky-9-test"
-  prefix       = "${local.prefix}-rocky9"
+  prefix       = local.prefix
   kvm_networks = local.kvm_networks
   vm_profile   = local.vm_profile
   user_data    = local.user_data
@@ -55,7 +55,7 @@ module "rocky_9_test" {
 
 module "debian_12_test" {
   source       = "./modules/vm-debian-12-test"
-  prefix       = "${local.prefix}-debian12"
+  prefix       = local.prefix
   kvm_networks = local.kvm_networks
   vm_profile   = local.vm_profile
   user_data    = local.user_data
