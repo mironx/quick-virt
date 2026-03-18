@@ -11,6 +11,26 @@ tasks:
     desc: Install KVM, libvirt, and related packages
     cmd: sudo {{.SCRIPTS_DIR}}/setup/install-kvm.sh
 
+  setup:enable-shared-folders:
+    desc: Allow libvirt-qemu to access current user's files (for shared folders / 9p)
+    cmd: sudo usermod -aG $(whoami) libvirt-qemu && echo "[ok] libvirt-qemu added to group $(whoami). Restart libvirtd: sudo systemctl restart libvirtd"
+
+  setup:disable-shared-folders:
+    desc: Remove libvirt-qemu from current user's group
+    cmd: sudo gpasswd -d libvirt-qemu $(whoami) && echo "[ok] libvirt-qemu removed from group $(whoami). Restart libvirtd: sudo systemctl restart libvirtd"
+
+  setup:enable-shared-folders-for:
+    desc: Allow libvirt-qemu to access a specific user's files (requires USER=<username>)
+    cmd: sudo usermod -aG {{.USER}} libvirt-qemu && echo "[ok] libvirt-qemu added to group {{.USER}}. Restart libvirtd{{":"}} sudo systemctl restart libvirtd"
+    requires:
+      vars: [USER]
+
+  setup:disable-shared-folders-for:
+    desc: Remove libvirt-qemu from a specific user's group (requires USER=<username>)
+    cmd: sudo gpasswd -d libvirt-qemu {{.USER}} && echo "[ok] libvirt-qemu removed from group {{.USER}}. Restart libvirtd{{":"}} sudo systemctl restart libvirtd"
+    requires:
+      vars: [USER]
+
   # ---------------------------------------------------------------------------
   # Linux Bridge
   # ---------------------------------------------------------------------------

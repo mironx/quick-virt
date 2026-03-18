@@ -135,6 +135,7 @@ module "vms" {
         os_profile   = set_val.os_profile
         os_image_mode   = set_val.os_image_mode
         os_disk_mode    = set_val.os_disk_mode
+        memory_backing  = set_val.memory_backing
         shared_folders  = set_val.shared_folders
         node         = node
       }
@@ -152,6 +153,7 @@ module "vms" {
   os_profile   = each.value.os_profile
   os_image_mode   = each.value.os_image_mode
   os_disk_mode    = each.value.os_disk_mode
+  memory_backing  = each.value.memory_backing
   shared_folders  = each.value.shared_folders
 
   networks = [

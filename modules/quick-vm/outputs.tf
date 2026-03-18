@@ -17,7 +17,9 @@ output "vm_networks" {
   value = [
     for idx, n in local.resolved_networks : {
       index            = idx
-      interface        = "${local.selected_os.interface_naming}${idx + local.selected_os.interface_offset}"
+      interface        = "${local.selected_os.interface_naming}${idx + local.selected_os.interface_offset + (
+        local.selected_os.interface_naming == "eth" ? 0 : length(var.shared_folders)
+      )}"
       ip               = n.ip
       profile_name     = n.profile_name
       kvm_network_name = try(n.profile.kvm_network_name, n.profile_name)

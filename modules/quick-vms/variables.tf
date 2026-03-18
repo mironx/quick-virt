@@ -55,6 +55,14 @@ variable "machines" {
     os_image_mode = optional(string, "local")
     os_disk_mode  = optional(string, "backing_store")
 
+    memory_backing = optional(object({
+      shared       = optional(bool, true)
+      source       = optional(string)
+      locked       = optional(bool, false)
+      discard      = optional(bool, false)
+      nosharepages = optional(bool, false)
+    }), {})
+
     shared_folders = optional(list(object({
       source    = string
       target    = string

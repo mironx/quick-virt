@@ -54,6 +54,18 @@ variable "vm_profile" {
   })
 }
 
+variable "memory_backing" {
+  description = "Memory backing configuration for the VM"
+  type = object({
+    shared       = optional(bool, true)
+    source       = optional(string)
+    locked       = optional(bool, false)
+    discard      = optional(bool, false)
+    nosharepages = optional(bool, false)
+  })
+  default = {}
+}
+
 variable "os_volume" {
   description = "Shared base volume from quick-os-volume module. Takes priority over os_name/os_profile."
   type = object({

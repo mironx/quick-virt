@@ -48,6 +48,10 @@ echo 'eval "$(task --completion zsh)"' >> ~/.zshrc
 ```bash
 # Setup
 task setup:install-kvm                                  # Install KVM and libvirt
+task setup:enable-shared-folders                        # Allow libvirt-qemu to access your files (9p shared folders)
+task setup:disable-shared-folders                       # Remove libvirt-qemu access
+task setup:enable-shared-folders-for USER=devx          # Same for a specific user
+task setup:disable-shared-folders-for USER=devx         # Remove for a specific user
 
 # OS Images
 task images:list                                        # List all OS images and download status

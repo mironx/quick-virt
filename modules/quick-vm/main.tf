@@ -172,7 +172,12 @@ locals {
     {
       networks = [
         for idx, n in local.resolved_networks : {
-          interface   = "${local.selected_os.interface_naming}${idx + local.selected_os.interface_offset}"
+          # For PCI-slot-based naming (enp0s*): shared_folders (9p filesystems) occupy
+          # PCI slots before network interfaces, shifting slot numbers by +1 per folder.
+          # For kernel-order naming (eth*): slot position doesn't affect naming.
+          interface = "${local.selected_os.interface_naming}${idx + local.selected_os.interface_offset + (
+            local.selected_os.interface_naming == "eth" ? 0 : length(var.shared_folders)
+          )}"
           ip          = n.ip
           mask        = try(n.profile.mask, "")
           gateway4    = try(n.profile.gateway4, "")
@@ -345,11 +350,17 @@ resource "libvirt_domain" "vm" {
   memory_unit = "MiB"
   vcpu        = local.current_vm_profile.vcpu
 
-  memory_backing = length(var.shared_folders) > 0 ? {
+  memory_backing = {
     memory_access = {
-      mode = "shared"
+      mode = var.memory_backing.shared ? "shared" : "private"
     }
-  } : null
+    memory_source = var.memory_backing.source != null ? {
+      type = var.memory_backing.source
+    } : null
+    memory_locked       = var.memory_backing.locked
+    memory_discard      = var.memory_backing.discard
+    memory_nosharepages = var.memory_backing.nosharepages
+  }
 
   os = {
     type = "hvm"
