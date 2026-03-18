@@ -1,0 +1,13 @@
+#cloud-config
+merge_how:
+ - name: list
+   settings: [append]
+ - name: dict
+   settings: [no_replace, recurse_list]
+
+runcmd:
+  - |
+    if mountpoint -q /mnt/vmdata 2>/dev/null; then
+      echo "ready" > /mnt/vmdata/$(hostname).txt
+      echo "$(date) - $(hostname) mounted vmdata successfully" >> /mnt/vmdata/$(hostname).log
+    fi

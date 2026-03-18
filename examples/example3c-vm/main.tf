@@ -24,6 +24,8 @@ locals {
     user_name     = "ubuntu"
     user_password = "ubuntu123"
   })
+
+  user_data_after = file("${path.module}/templates/user-data-after.tmpl")
 }
 
 module "ubuntu_22_test" {
@@ -31,8 +33,9 @@ module "ubuntu_22_test" {
   prefix       = local.prefix
   kvm_networks = local.kvm_networks
   vm_profile   = local.vm_profile
-  user_data    = local.user_data
-  vmdata_path  = "${abspath(path.module)}/vmdata"
+  user_data       = local.user_data
+  user_data_after = local.user_data_after
+  vmdata_path     = "${abspath(path.module)}/vmdata"
 }
 
 module "ubuntu_24_test" {
@@ -40,8 +43,9 @@ module "ubuntu_24_test" {
   prefix       = local.prefix
   kvm_networks = local.kvm_networks
   vm_profile   = local.vm_profile
-  user_data    = local.user_data
-  vmdata_path  = "${abspath(path.module)}/vmdata"
+  user_data       = local.user_data
+  user_data_after = local.user_data_after
+  vmdata_path     = "${abspath(path.module)}/vmdata"
 }
 
 module "rocky_9_test" {
@@ -49,8 +53,9 @@ module "rocky_9_test" {
   prefix       = local.prefix
   kvm_networks = local.kvm_networks
   vm_profile   = local.vm_profile
-  user_data    = local.user_data
-  vmdata_path  = "${abspath(path.module)}/vmdata"
+  user_data       = local.user_data
+  user_data_after = local.user_data_after
+  vmdata_path     = "${abspath(path.module)}/vmdata"
 }
 
 module "debian_12_test" {
@@ -58,8 +63,9 @@ module "debian_12_test" {
   prefix       = local.prefix
   kvm_networks = local.kvm_networks
   vm_profile   = local.vm_profile
-  user_data    = local.user_data
-  vmdata_path  = "${abspath(path.module)}/vmdata"
+  user_data       = local.user_data
+  user_data_after = local.user_data_after
+  vmdata_path     = "${abspath(path.module)}/vmdata"
 }
 
 output "ubuntu_22" {

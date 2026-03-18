@@ -30,8 +30,10 @@ variable "machines" {
       name     = string
       password = string
     })
-    cloud_init_user_data_path     = optional(string)
-    cloud_init_user_data_template = optional(string)
+    cloud_init_user_data_path          = optional(string)
+    cloud_init_user_data_template      = optional(string)
+    cloud_init_user_data_after_path     = optional(string)
+    cloud_init_user_data_after_template = optional(string)
 
     os_volume = optional(object({
       path    = string

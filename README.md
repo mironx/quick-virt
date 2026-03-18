@@ -48,10 +48,12 @@ echo 'eval "$(task --completion zsh)"' >> ~/.zshrc
 ```bash
 # Setup
 task setup:install-kvm                                  # Install KVM and libvirt
-task setup:enable-shared-folders                        # Allow libvirt-qemu to access your files (9p shared folders)
+task setup:enable-shared-folders                        # Allow libvirt-qemu to access your files
 task setup:disable-shared-folders                       # Remove libvirt-qemu access
 task setup:enable-shared-folders-for USER=devx          # Same for a specific user
 task setup:disable-shared-folders-for USER=devx         # Remove for a specific user
+task setup:install-virtiofsd                            # Install virtiofsd (for virtiofs shared folders)
+task setup:check-shared-folders-drivers                 # Check virtiofs and 9p driver availability
 
 # OS Images
 task images:list                                        # List all OS images and download status

@@ -79,14 +79,13 @@ resource "null_resource" "validate_shared_folders" {
 
   lifecycle {
     precondition {
-      condition     = length(fileset(each.value.source, "*")) >= 0
-      error_message = <<-EOT
-        Shared folder source directory not found: ${each.value.source}
-        [vm_name:${var.name}, target:${each.value.target}]
+      condition     = each.value.source != null && each.value.source != ""
+      error_message = "Shared folder source path must not be empty [vm_name:${var.name}, target:${each.value.target}]"
+    }
 
-        Create it first:
-          mkdir -p ${each.value.source}
-      EOT
+    precondition {
+      condition     = each.value.target != null && each.value.target != ""
+      error_message = "Shared folder target (mount tag) must not be empty [vm_name:${var.name}]"
     }
   }
   depends_on = [null_resource.validate]

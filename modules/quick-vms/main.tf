@@ -68,6 +68,22 @@ locals {
       )
     )
   }
+
+  user_data_after_map = {
+    for set_key, set_val in var.machines :
+    set_key => (
+      set_val.cloud_init_user_data_after_template != null
+      ? set_val.cloud_init_user_data_after_template
+      : (
+        set_val.cloud_init_user_data_after_path != null
+        ? templatefile("${path.root}/${set_val.cloud_init_user_data_after_path}", {
+          user_name     = set_val.user.name,
+          user_password = set_val.user.password
+        })
+        : null
+      )
+    )
+  }
 }
 
 //-------------------------------------------------------------------------------
@@ -129,8 +145,9 @@ module "vms" {
         set_name     = set_val.set_name
         vm_profile   = set_val.vm_profile
         main_storage = set_val.main_storage
-        user_data    = local.user_data_map[set_key]
-        os_volume    = set_val.os_volume
+        user_data       = local.user_data_map[set_key]
+        user_data_after = local.user_data_after_map[set_key]
+        os_volume       = set_val.os_volume
         os_name      = set_val.os_name
         os_profile   = set_val.os_profile
         os_image_mode   = set_val.os_image_mode
@@ -146,8 +163,9 @@ module "vms" {
   source       = "../quick-vm"
   name         = "${each.value.set_name}-${each.value.node.name}"
   description  = each.value.node.description
-  user_data    = each.value.user_data
-  vm_profile   = each.value.vm_profile
+  user_data       = each.value.user_data
+  user_data_after = each.value.user_data_after
+  vm_profile      = each.value.vm_profile
   main_storage = each.value.main_storage
   os_volume    = each.value.os_volume
   os_name      = each.value.os_name

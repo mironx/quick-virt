@@ -194,38 +194,58 @@ locals {
     }
   )
 
-  _base_user_data = replace(var.user_data, "HOST_NAME", var.name)
-
   # Priority: var.fs_type > os_profile.fs_type > os_name builtin
   fs_type = coalesce(var.fs_type, local.selected_os.fs_type)
 
-  _shared_folders_cloud_config = length(var.shared_folders) > 0 ? templatefile(
+  # Cloud-init multipart MIME fragments:
+  # 1. hostname (always, auto-generated)
+  # 2. user_data (user template — users, packages, base runcmd)
+  # 3. shared-folders (auto, if shared_folders > 0 — modprobe, mkdir, mount)
+  # 4. user_data_after (optional — runcmd after shared folders mount)
+
+  _mime_hostname = templatefile("${path.module}/templates/cloud-config-hostname.tmpl", {
+    hostname = var.name
+  })
+
+  _mime_shared_folders = length(var.shared_folders) > 0 ? templatefile(
     "${path.module}/templates/cloud-config-shared-folders.tmpl", {
       shared_folders = var.shared_folders
       fs_type        = local.fs_type
     }
   ) : ""
 
-  # When shared_folders exist, combine user_data with shared folders config via multipart MIME
-  # Cloud-init merges packages and runcmd from both parts automatically
-  user_data = length(var.shared_folders) > 0 ? join("\n", [
-    "Content-Type: multipart/mixed; boundary=\"MIMEBOUNDARY\"",
-    "MIME-Version: 1.0",
-    "",
-    "--MIMEBOUNDARY",
-    "Content-Type: text/cloud-config; charset=\"us-ascii\"",
-    "Content-Disposition: attachment; filename=\"base.cfg\"",
-    "",
-    local._base_user_data,
-    "",
-    "--MIMEBOUNDARY",
-    "Content-Type: text/cloud-config; charset=\"us-ascii\"",
-    "Content-Disposition: attachment; filename=\"shared-folders.cfg\"",
-    "",
-    local._shared_folders_cloud_config,
-    "",
-    "--MIMEBOUNDARY--",
-  ]) : local._base_user_data
+  _mime_parts = concat(
+    [
+      { filename = "hostname.cfg", content = trimspace(local._mime_hostname) },
+      { filename = "base.cfg",     content = trimspace(var.user_data) },
+    ],
+    length(var.shared_folders) > 0 ? [
+      { filename = "shared-folders.cfg", content = trimspace(local._mime_shared_folders) },
+    ] : [],
+    var.user_data_after != null ? [
+      { filename = "after.cfg", content = trimspace(var.user_data_after) },
+    ] : [],
+  )
+
+  # Always use multipart MIME — hostname is always a separate fragment
+  user_data = join("\n", concat(
+    [
+      "Content-Type: multipart/mixed; boundary=\"MIMEBOUNDARY\"",
+      "MIME-Version: 1.0",
+      "",
+    ],
+    flatten([
+      for part in local._mime_parts : [
+        "--MIMEBOUNDARY",
+        "Content-Type: text/cloud-config; charset=\"us-ascii\"",
+        "Content-Disposition: attachment; filename=\"${part.filename}\"",
+        "",
+        part.content,
+        "",
+      ]
+    ]),
+    ["--MIMEBOUNDARY--"],
+  ))
 
   meta_data = templatefile("${path.module}/templates/meta-data.tmpl", {
     instance_id    = var.name

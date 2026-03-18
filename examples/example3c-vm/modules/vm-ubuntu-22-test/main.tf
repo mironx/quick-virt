@@ -133,6 +133,7 @@ module "vm_F1" {
   user_data    = var.user_data
   vm_profile   = var.vm_profile
   kvm-networks = var.kvm_networks
+  user_data_after = var.user_data_after
   shared_folders = [
     { source = var.vmdata_path, target = "vmdata" }
   ]
@@ -151,6 +152,7 @@ module "vm_F2" {
   user_data    = var.user_data
   vm_profile   = var.vm_profile
   kvm-networks = var.kvm_networks
+  user_data_after = var.user_data_after
   shared_folders = [
     { source = var.vmdata_path, target = "vmdata" }
   ]

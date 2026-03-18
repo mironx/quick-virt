@@ -24,6 +24,11 @@ variable "user_data" {
   type = string
 }
 
+variable "user_data_after" {
+  type    = string
+  default = null
+}
+
 variable "vmdata_path" {
   description = "Absolute path to shared vmdata directory"
   type        = string

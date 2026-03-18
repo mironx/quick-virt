@@ -33,7 +33,13 @@ variable "storage_pool" {
 
 variable "user_data" {
     type = string
-    description = "User data for cloud-init"
+    description = "User data for cloud-init (runs before shared folders mount)"
+}
+
+variable "user_data_after" {
+    type        = string
+    description = "Additional cloud-init user data that runs after shared folders mount"
+    default     = null
 }
 
 variable "main_storage" {
