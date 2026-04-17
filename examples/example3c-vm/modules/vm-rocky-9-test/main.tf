@@ -128,7 +128,9 @@ module "vm_F1" {
   user_data    = var.user_data
   vm_profile   = var.vm_profile
   kvm-networks = var.kvm_networks
-  user_data_after = var.user_data_after
+  run_after = [
+    "mountpoint -q /mnt/vmdata 2>/dev/null && echo ready > /mnt/vmdata/${var.prefix}-F1.txt",
+  ]
   shared_folders = [
     { source = var.vmdata_path, target = "vmdata" }
   ]
@@ -143,11 +145,12 @@ module "vm_F2" {
   name         = "${var.prefix}-rocky9-F2"
   os_volume    = module.base_rocky_9.volume
   os_disk_mode    = "backing_store"
-  fs_type         = "9p"
   user_data    = var.user_data
   vm_profile   = var.vm_profile
   kvm-networks = var.kvm_networks
-  user_data_after = var.user_data_after
+  run_after = [
+    "mountpoint -q /mnt/vmdata 2>/dev/null && echo ready > /mnt/vmdata/${var.prefix}-F2.txt",
+  ]
   shared_folders = [
     { source = var.vmdata_path, target = "vmdata" }
   ]

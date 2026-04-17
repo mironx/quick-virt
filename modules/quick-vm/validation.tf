@@ -87,6 +87,27 @@ resource "null_resource" "validate_shared_folders" {
       condition     = each.value.target != null && each.value.target != ""
       error_message = "Shared folder target (mount tag) must not be empty [vm_name:${var.name}]"
     }
+
+    precondition {
+      condition = fileexists("${each.value.source}/.gitkeep")
+      error_message = <<-EOT
+        Shared folder directory not found: ${each.value.source}
+        [vm_name:${var.name}, target:${each.value.target}]
+
+        Create it:
+          mkdir -p ${basename(each.value.source)} && touch ${basename(each.value.source)}/.gitkeep
+      EOT
+    }
+
+    precondition {
+      condition = !(local.fs_type == "9p" && contains(["rocky_9"], coalesce(var.os_name, try(var.os_volume.os_name, ""))))
+      error_message = <<-EOT
+        fs_type "9p" is not supported on Rocky Linux 9 — kernel does not include 9p module.
+        [vm_name:${var.name}]
+
+        Use fs_type = "virtiofs" instead (default).
+      EOT
+    }
   }
   depends_on = [null_resource.validate]
 }

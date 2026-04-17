@@ -10,6 +10,12 @@ runcmd:
 %{ if fs_type == "virtiofs" ~}
   - modprobe virtiofs || true
 %{ else ~}
+  - |
+    if ! modinfo 9p >/dev/null 2>&1; then
+      if command -v dnf >/dev/null 2>&1; then
+        dnf install -y kernel-modules-extra-$(uname -r) || true
+      fi
+    fi
   - modprobe 9p || true
   - modprobe 9pnet_virtio || true
 %{ endif ~}

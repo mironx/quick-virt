@@ -166,6 +166,7 @@ locals {
   }
 
   validated_user_data = yamldecode(var.user_data)
+
 }
 
 //-------------------------------------------------------------------------------
@@ -197,15 +198,23 @@ locals {
   # Priority: var.fs_type > os_profile.fs_type > os_name builtin
   fs_type = coalesce(var.fs_type, local.selected_os.fs_type)
 
-  # Cloud-init multipart MIME fragments:
+  # Cloud-init multipart MIME fragments (in order):
   # 1. hostname (always, auto-generated)
-  # 2. user_data (user template — users, packages, base runcmd)
-  # 3. shared-folders (auto, if shared_folders > 0 — modprobe, mkdir, mount)
-  # 4. user_data_after (optional — runcmd after shared folders mount)
+  # 2. run_before (optional — commands before user_data)
+  # 3. user_data (user template — users, packages, base runcmd)
+  # 4. shared-folders (auto, if shared_folders > 0 — modprobe, mkdir, mount)
+  # 5. run_after (optional — commands after shared folders mount)
+  # 6. user_data_after (optional — full cloud-config after everything)
 
   _mime_hostname = templatefile("${path.module}/templates/cloud-config-hostname.tmpl", {
     hostname = var.name
   })
+
+  _mime_run_before = length(var.run_before) > 0 ? templatefile(
+    "${path.module}/templates/cloud-config-runcmd.tmpl", {
+      commands = var.run_before
+    }
+  ) : ""
 
   _mime_shared_folders = length(var.shared_folders) > 0 ? templatefile(
     "${path.module}/templates/cloud-config-shared-folders.tmpl", {
@@ -214,13 +223,27 @@ locals {
     }
   ) : ""
 
+  _mime_run_after = length(var.run_after) > 0 ? templatefile(
+    "${path.module}/templates/cloud-config-runcmd.tmpl", {
+      commands = var.run_after
+    }
+  ) : ""
+
   _mime_parts = concat(
     [
       { filename = "hostname.cfg", content = trimspace(local._mime_hostname) },
-      { filename = "base.cfg",     content = trimspace(var.user_data) },
+    ],
+    length(var.run_before) > 0 ? [
+      { filename = "run-before.cfg", content = trimspace(local._mime_run_before) },
+    ] : [],
+    [
+      { filename = "base.cfg", content = trimspace(var.user_data) },
     ],
     length(var.shared_folders) > 0 ? [
       { filename = "shared-folders.cfg", content = trimspace(local._mime_shared_folders) },
+    ] : [],
+    length(var.run_after) > 0 ? [
+      { filename = "run-after.cfg", content = trimspace(local._mime_run_after) },
     ] : [],
     var.user_data_after != null ? [
       { filename = "after.cfg", content = trimspace(var.user_data_after) },

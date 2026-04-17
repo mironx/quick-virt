@@ -34,6 +34,8 @@ variable "machines" {
     cloud_init_user_data_template      = optional(string)
     cloud_init_user_data_after_path     = optional(string)
     cloud_init_user_data_after_template = optional(string)
+    run_before = optional(list(string), [])
+    run_after  = optional(list(string), [])
 
     os_volume = optional(object({
       path    = string

@@ -42,3 +42,4 @@ terraform.rc
 
 # VM shared data files (created by VMs at runtime)
 vmdata/*.txt
+**/vmdata/*.txt

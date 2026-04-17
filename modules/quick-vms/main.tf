@@ -147,6 +147,8 @@ module "vms" {
         main_storage = set_val.main_storage
         user_data       = local.user_data_map[set_key]
         user_data_after = local.user_data_after_map[set_key]
+        run_before      = set_val.run_before
+        run_after       = set_val.run_after
         os_volume       = set_val.os_volume
         os_name      = set_val.os_name
         os_profile   = set_val.os_profile
@@ -165,6 +167,8 @@ module "vms" {
   description  = each.value.node.description
   user_data       = each.value.user_data
   user_data_after = each.value.user_data_after
+  run_before      = each.value.run_before
+  run_after       = each.value.run_after
   vm_profile      = each.value.vm_profile
   main_storage = each.value.main_storage
   os_volume    = each.value.os_volume
