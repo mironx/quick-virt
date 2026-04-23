@@ -19,6 +19,52 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fi
 - Task runner (`Taskfile`) for common operations including OS image management.
 - Includes helper scripts for system setup and recovery.
 
+## Quick Install (no clone required)
+
+Install the `quick-virt` CLI — Taskfile + helper scripts — without cloning the repo. It pulls the **latest tag** by default:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mironx/quick-virt/main/install.sh | bash
+```
+
+Pin a specific version, or track `main`:
+
+```bash
+# Pinned tag:
+curl -fsSL https://raw.githubusercontent.com/mironx/quick-virt/main/install.sh | QV_VERSION=v0.1.8 bash
+
+# Development head:
+curl -fsSL https://raw.githubusercontent.com/mironx/quick-virt/main/install.sh | QV_VERSION=main bash
+```
+
+The installer places:
+
+| Location | What |
+|----------|------|
+| `~/.local/share/quick-virt/` | `Taskfile.yml` + `scripts/` + `modules/quick-kvm-network-reader/scripts/` |
+| `~/.local/bin/quick-virt` | Wrapper that runs `task -t ~/.local/share/quick-virt/Taskfile.yml "$@"` |
+
+**Prerequisites:** `curl`, `tar`, and [Task](https://taskfile.dev). The installer will warn if `task` isn't on your PATH.
+
+**Usage:**
+
+```bash
+quick-virt --list                          # list all available tasks
+quick-virt setup:install-kvm               # install KVM + libvirt
+quick-virt setup:install-nfs-server        # install NFS server
+quick-virt images:download:ubuntu22        # download Ubuntu 22.04 cloud image
+```
+
+**Management:**
+
+```bash
+quick-virt self:version       # show installed version
+quick-virt self:update        # re-install the latest tag
+quick-virt self:uninstall     # remove
+```
+
+The full ordered task reference is in [`doc/SETUP.md`](./doc/SETUP.md).
+
 ## Setup
 
 See [`doc/SETUP.md`](./doc/SETUP.md) for Task runner installation, ordered task reference, and helper scripts.

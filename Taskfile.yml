@@ -5,6 +5,44 @@ vars:
 
 tasks:
   # ---------------------------------------------------------------------------
+  # Self-management (for users who installed via install.sh)
+  # ---------------------------------------------------------------------------
+  self:version:
+    desc: Show the installed quick-virt version
+    cmd: |
+      if [ -f "{{.TASKFILE_DIR}}/.version" ]; then
+        cat "{{.TASKFILE_DIR}}/.version"
+      else
+        echo "unknown (running from a cloned repo, not an install)"
+      fi
+
+  self:where:
+    desc: Show where quick-virt is installed (prefix, binary, Taskfile, version)
+    cmd: |
+      echo "prefix   : {{.TASKFILE_DIR}}"
+      echo "taskfile : {{.TASKFILE_DIR}}/Taskfile.yml"
+      if command -v quick-virt >/dev/null 2>&1; then
+        echo "binary   : $(command -v quick-virt)"
+      else
+        echo "binary   : (quick-virt wrapper not on PATH)"
+      fi
+      if [ -f "{{.TASKFILE_DIR}}/.version" ]; then
+        echo "version  : $(cat "{{.TASKFILE_DIR}}/.version")"
+      else
+        echo "version  : unknown (running from a cloned repo, not an install)"
+      fi
+
+  self:update:
+    desc: Re-install the latest tag (or override with QV_VERSION=<tag>)
+    cmd: curl -fsSL https://raw.githubusercontent.com/mironx/quick-virt/main/install.sh | bash
+
+  self:uninstall:
+    desc: Remove the quick-virt installation (~/.local/share/quick-virt and ~/.local/bin/quick-virt)
+    cmd: |
+      rm -rf "$HOME/.local/share/quick-virt" "$HOME/.local/bin/quick-virt"
+      echo "[ok] quick-virt uninstalled"
+
+  # ---------------------------------------------------------------------------
   # Setup
   # ---------------------------------------------------------------------------
   setup:install-kvm:
