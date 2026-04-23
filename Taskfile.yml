@@ -120,11 +120,18 @@ tasks:
     desc: Remove all KVM networks
     cmd: sudo {{.SCRIPTS_DIR}}/tools/clean-kvm-network.sh
 
-  tools:init-cloud-config:
+  # ---------------------------------------------------------------------------
+  # Scaffold — bootstrap boilerplate configs into a target directory
+  # ---------------------------------------------------------------------------
+  scaffold:init-cloud-config:
     desc: Create a cloud-init user-data template (requires DIR=<path>)
-    cmd: '{{.SCRIPTS_DIR}}/tools/init-cloud-config.sh {{.DIR}}'
+    cmd: '{{.SCRIPTS_DIR}}/scaffold/init-cloud-config.sh {{.DIR}}'
     requires:
       vars: [DIR]
+
+  scaffold:init-networks:
+    desc: 'Scaffold a Terraform project for KVM networks (optional DIR=<path> default=., REF=<tag> default=installed version). Example{{":"}} task scaffold:init-networks DIR=./networks'
+    cmd: '{{.SCRIPTS_DIR}}/scaffold/init-networks.sh "{{.DIR | default "."}}" "{{.REF | default ""}}"'
 
   # ---------------------------------------------------------------------------
   # OS Images

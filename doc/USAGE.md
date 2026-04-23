@@ -133,6 +133,9 @@ Provisions one KVM domain with cloud-init, dynamic networks, shared folders, and
 
 **Source:** `modules/quick-vm`
 
+> ⚠️ **Prerequisite — libvirt networks must already exist.**
+> Every `profile_name` in `networks = [...]` refers to a libvirt network by name. Create them **first** with [`quick-networks`](#quick-networks--kvm-networks) (or the ready-made [`examples/example1-network`](../examples/example1-network)) — otherwise `terraform apply` fails with *"network not found"*.
+
 **Inputs (most common)**
 
 | Name | Type | Required | Default | Description |
@@ -189,6 +192,9 @@ module "vm1" {
 Provisions **sets of VMs** (e.g. `masters`, `workers`) sharing OS image, profile, and cloud-init. Internally instantiates `quick-vm` per node.
 
 **Source:** `modules/quick-vms`
+
+> ⚠️ **Prerequisite — libvirt networks must already exist.**
+> Every key in `kvm-networks = {...}` and every `profile_name` inside a node's `networks` must match a libvirt network name. Create them **first** with [`quick-networks`](#quick-networks--kvm-networks) (or apply [`examples/example1-network`](../examples/example1-network)).
 
 **Inputs**
 
