@@ -4,6 +4,10 @@ terraform {
       source  = "dmacvicar/libvirt"
       version = "~> 0.9.0"
     }
+    local = {
+      source  = "hashicorp/local"
+      version = ">= 2.4.0"
+    }
   }
 }
 
@@ -190,6 +194,51 @@ module "vms" {
       enabled      = contains(keys(local.enabled_kvm_networks), net.profile_name)
     }
   ]
+}
+
+//-------------------------------------------------------------------------------
+// Set-level resource-limit scripts (apply / clear over every node in the set).
+// Only emitted when the set has vm_profile.enable_live = true, matching the
+// per-VM scripts that quick-vm generates under ./.qv-limits/.
+//-------------------------------------------------------------------------------
+
+locals {
+  _set_vm_names = {
+    for set_key, set_val in var.machines : set_key => [
+      for node in set_val.nodes : "${set_val.set_name}-${node.name}"
+    ]
+  }
+
+  _sets_with_live_limits = {
+    for set_key, set_val in var.machines : set_key => set_val
+    if try(set_val.vm_profile.enable_live, false)
+  }
+}
+
+resource "local_file" "set_limits_apply" {
+  for_each        = local._sets_with_live_limits
+  filename        = "${path.root}/.qv-limits/qv-limits.apply-all.${each.value.set_name}.sh"
+  file_permission = "0755"
+  content = templatefile(
+    "${path.module}/templates/limits-apply-set.sh.tmpl",
+    {
+      set_name = each.value.set_name
+      vm_names = local._set_vm_names[each.key]
+    }
+  )
+}
+
+resource "local_file" "set_limits_clear" {
+  for_each        = local._sets_with_live_limits
+  filename        = "${path.root}/.qv-limits/qv-limits.clear-all.${each.value.set_name}.sh"
+  file_permission = "0755"
+  content = templatefile(
+    "${path.module}/templates/limits-clear-set.sh.tmpl",
+    {
+      set_name = each.value.set_name
+      vm_names = local._set_vm_names[each.key]
+    }
+  )
 }
 
 //-------------------------------------------------------------------------------

@@ -1,0 +1,83 @@
+#!/bin/bash
+# =============================================================================
+# quick-virt — clear ALL resource limits from a VM (live, no reboot)
+# =============================================================================
+# Auto-generated counterpart to qv-limits.apply.<vm>.sh. Use to quickly lift every
+# CPU and I/O cap for a running VM — e.g. when benchmarking without limits,
+# or to roll back an experimental throttle.
+#
+# Effect:
+#   - CPU: vcpu_quota set to -1 (unlimited)
+#   - I/O: every throttle parameter (baseline + burst, bytes + iops) set to 0
+#          (libvirt convention: 0 = no limit)
+#
+# Both --live (take effect immediately) and --config (persist across restart)
+# are applied. To clear only in-memory, remove --config from the invocations
+# below and rerun.
+#
+# Usage:
+#   bash qv-limits.clear.${vm_name}.sh            # clear limits on '${vm_name}'
+#   bash qv-limits.clear.${vm_name}.sh OTHER_VM   # override target VM name
+# =============================================================================
+set -euo pipefail
+
+VM="$${1:-${vm_name}}"
+
+if ! command -v virsh >/dev/null 2>&1; then
+    echo "[error] 'virsh' not found — install libvirt-clients" >&2
+    exit 1
+fi
+
+if ! virsh dominfo "$VM" >/dev/null 2>&1; then
+    echo "[error] VM '$VM' not found in libvirt" >&2
+    exit 1
+fi
+
+echo "[*] Clearing all resource limits on '$VM'"
+
+# -----------------------------------------------------------------------------
+# CPU — reset vcpu_quota to -1 (unlimited). vcpu_period is left as-is because
+# libvirt requires it to stay a positive integer even when quota is -1.
+# -----------------------------------------------------------------------------
+echo "[*] CPU: unlimit vcpu_quota"
+virsh schedinfo "$VM" --live --config --set vcpu_quota=-1
+
+# -----------------------------------------------------------------------------
+# I/O — zero every throttle dimension on disk 'vda'. 0 = "no limit" in libvirt.
+# The device argument matches the main disk; adjust if your domain uses a
+# different target dev name.
+# -----------------------------------------------------------------------------
+echo "[*] I/O vda: unlimit every dimension"
+virsh blkdeviotune "$VM" vda --live --config \
+    --read-bytes-sec 0 \
+    --write-bytes-sec 0 \
+    --read-iops-sec 0 \
+    --write-iops-sec 0 \
+    --read-bytes-sec-max 0 \
+    --read-bytes-sec-max-length 0 \
+    --write-bytes-sec-max 0 \
+    --write-bytes-sec-max-length 0 \
+    --read-iops-sec-max 0 \
+    --read-iops-sec-max-length 0 \
+    --write-iops-sec-max 0 \
+    --write-iops-sec-max-length 0
+
+# -----------------------------------------------------------------------------
+# Network bandwidth — zero inbound and outbound on every interface.
+# We iterate over all attached NICs because we don't know which ones the
+# module configured vs which were added ad-hoc; clearing unconfigured NICs
+# is a no-op.
+# -----------------------------------------------------------------------------
+mapfile -t _QV_IFACES < <(virsh domiflist "$VM" | awk 'NR>2 && NF >= 3 {print $1}')
+for _QV_DEV in "$${_QV_IFACES[@]}"; do
+    echo "[*] Net iface $_QV_DEV: clear bandwidth"
+    virsh domiftune "$VM" "$_QV_DEV" --live --config \
+        --inbound  "0,0,0,0" \
+        --outbound "0,0,0"   || true
+done
+
+echo "[ok] All limits cleared on '$VM'"
+echo "    Verify:"
+echo "      virsh schedinfo $VM"
+echo "      virsh blkdeviotune $VM vda"
+echo "      virsh domiftune $VM <iface>"

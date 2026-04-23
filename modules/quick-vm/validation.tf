@@ -112,6 +112,67 @@ resource "null_resource" "validate_shared_folders" {
   depends_on = [null_resource.validate]
 }
 
+resource "null_resource" "validate_resource_limits" {
+  lifecycle {
+    precondition {
+      condition     = try(var.vm_profile.cpu.limit.percent, null) == null || (var.vm_profile.cpu.limit.percent > 0 && var.vm_profile.cpu.limit.percent <= 100)
+      error_message = "vm_profile.cpu.limit.percent must be in (0, 100] [vm_name:${var.name}]"
+    }
+
+    precondition {
+      condition     = try(var.vm_profile.cpu.limit.period_us, null) == null || (var.vm_profile.cpu.limit.period_us >= 1000 && var.vm_profile.cpu.limit.period_us <= 1000000)
+      error_message = "vm_profile.cpu.limit.period_us must be in [1000, 1000000] microseconds [vm_name:${var.name}]"
+    }
+
+    precondition {
+      condition     = try(var.vm_profile.cpu.limit.quota_us, null) == null || var.vm_profile.cpu.limit.quota_us > 0
+      error_message = "vm_profile.cpu.limit.quota_us must be > 0 [vm_name:${var.name}]"
+    }
+
+    precondition {
+      condition = alltrue([
+        for dev, t in coalesce(try(var.vm_profile.io, null), {}) :
+        alltrue([
+          try(t.read_bytes_sec,   0) >= 0,
+          try(t.write_bytes_sec,  0) >= 0,
+          try(t.read_iops_sec,    0) >= 0,
+          try(t.write_iops_sec,   0) >= 0,
+        ])
+      ])
+      error_message = "vm_profile.io.<dev>.* values must be >= 0 (0 = unlimited) [vm_name:${var.name}]"
+    }
+
+    precondition {
+      condition = alltrue(flatten([
+        for dev, t in coalesce(try(var.vm_profile.io, null), {}) : [
+          for u in compact([
+            try(t.bytes_unit, null),
+            try(t.read_bytes_sec_unit, null),
+            try(t.write_bytes_sec_unit, null),
+            try(t.read_bytes_sec_max_unit, null),
+            try(t.write_bytes_sec_max_unit, null),
+          ]) : contains(["B", "KB", "MB", "GB"], u)
+        ]
+      ]))
+      error_message = "vm_profile.io.<dev>.*_unit must be one of: B, KB, MB, GB [vm_name:${var.name}]"
+    }
+
+    precondition {
+      condition = alltrue(flatten([
+        for iface, cfg in coalesce(try(var.vm_profile.network, null), {}) : [
+          for u in compact([
+            try(cfg.rate_unit, null),
+            try(cfg.inbound.average_unit,  null), try(cfg.inbound.peak_unit,  null), try(cfg.inbound.burst_unit,  null), try(cfg.inbound.floor_unit,  null),
+            try(cfg.outbound.average_unit, null), try(cfg.outbound.peak_unit, null), try(cfg.outbound.burst_unit, null), try(cfg.outbound.floor_unit, null),
+          ]) : contains(["KB", "MB", "GB"], u)
+        ]
+      ]))
+      error_message = "vm_profile.network.<iface>.*_unit must be one of: KB, MB, GB [vm_name:${var.name}]"
+    }
+  }
+  depends_on = [null_resource.validate]
+}
+
 resource "null_resource" "validate_nfs_mounts" {
   for_each = { for idx, m in var.nfs_mounts : tostring(idx) => m }
 

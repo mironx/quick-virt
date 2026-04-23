@@ -1,0 +1,41 @@
+#!/bin/bash
+# =============================================================================
+# quick-virt — clear ALL resource limits from every VM in the '${set_name}' set
+# =============================================================================
+# Auto-generated counterpart to qv-limits.apply-all.<set>.sh. Runs
+# qv-limits.clear.<vm>.sh for every node in the set.
+#
+# Usage:
+#   bash qv-limits.clear-all.${set_name}.sh
+# =============================================================================
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+VMS=(
+%{ for name in vm_names ~}
+    "${name}"
+%{ endfor ~}
+)
+
+echo "[*] Clearing limits on ${length(vm_names)} VM(s) in set '${set_name}'"
+
+fail=0
+for vm in "$${VMS[@]}"; do
+    script="$SCRIPT_DIR/qv-limits.clear.$vm.sh"
+    if [ ! -f "$script" ]; then
+        echo "[warn] $vm: per-VM clear script not found ($script) — skipping"
+        continue
+    fi
+    echo "--- $vm ---"
+    if ! bash "$script" "$vm"; then
+        echo "[error] $vm: clear failed"
+        fail=$((fail + 1))
+    fi
+done
+
+if [ "$fail" -gt 0 ]; then
+    echo "[error] $fail VM(s) failed in set '${set_name}'" >&2
+    exit 1
+fi
+echo "[ok] All limits cleared in set '${set_name}'"

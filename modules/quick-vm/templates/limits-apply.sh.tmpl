@@ -1,0 +1,171 @@
+#!/bin/bash
+# =============================================================================
+# quick-virt — apply VM resource limits live via virsh
+# =============================================================================
+# Auto-generated from vm_profile in Terraform. Do NOT edit by hand.
+#
+# Usage:
+#   bash qv-limits.apply.${vm_name}.sh            # apply to VM '${vm_name}'
+#   bash qv-limits.apply.${vm_name}.sh OTHER_VM   # override target VM name
+#
+# Effect: changes take effect immediately on the running VM. With --config,
+# they also persist in the domain XML (surviving restarts).
+#
+# Requires: virsh installed on the host (part of libvirt-clients).
+# =============================================================================
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+VM="$${1:-${vm_name}}"
+
+if ! command -v virsh >/dev/null 2>&1; then
+    echo "[error] 'virsh' not found — install libvirt-clients" >&2
+    exit 1
+fi
+
+if ! virsh dominfo "$VM" >/dev/null 2>&1; then
+    echo "[error] VM '$VM' not found in libvirt" >&2
+    exit 1
+fi
+
+echo "[*] Applying resource limits to '$VM'"
+
+%{ if cpu_limit != null ~}
+# -----------------------------------------------------------------------------
+# CPU — sourced from the sidecar .ini at runtime so you can edit values and
+# re-apply without re-running `terraform apply`.
+#
+# Mode selection:
+#   * RAW     — period_us AND quota_us uncommented in [cpu]: use them verbatim.
+#   * PERCENT — only `percent` uncommented: quota_us = vcpu × period × percent/100.
+#   * SKIP    — neither set.
+# -----------------------------------------------------------------------------
+
+# --- tiny INI reader (awk-based, no jq/yq dependency) -------------------------
+ini_get() {
+    local section="$1" key="$2" file="$3"
+    awk -v sec="[$section]" -v k="$key" '
+        $0 == sec   { in_sec=1; next }
+        /^\[/       { in_sec=0 }
+        in_sec && $0 !~ /^[[:space:]]*[#;]/ && $0 ~ "^[[:space:]]*"k"[[:space:]]*=" {
+            sub(/^[^=]*=[[:space:]]*/, "")
+            sub(/[[:space:]]+$/, "")
+            print
+            exit
+        }
+    ' "$file"
+}
+
+INI_FILE="$SCRIPT_DIR/qv-limits.spec.${vm_name}.ini"
+
+if [ ! -f "$INI_FILE" ]; then
+    echo "[warn] CPU: ini file not found ($INI_FILE) — skipping CPU section"
+else
+    cpu_percent=$(ini_get cpu percent    "$INI_FILE")
+    cpu_period=$(ini_get  cpu period_us  "$INI_FILE")
+    cpu_quota=$(ini_get   cpu quota_us   "$INI_FILE")
+    cpu_vcpu=$(ini_get    cpu vcpu       "$INI_FILE")
+    cpu_shares=$(ini_get  cpu shares     "$INI_FILE")
+
+    _final_period=""
+    _final_quota=""
+
+    if [ -n "$cpu_period" ] && [ -n "$cpu_quota" ]; then
+        _final_period="$cpu_period"
+        _final_quota="$cpu_quota"
+        echo "[cpu] mode=RAW     period=$${_final_period}us quota=$${_final_quota}us (from .ini)"
+    elif [ -n "$cpu_percent" ]; then
+        _final_period="$${cpu_period:-100000}"
+        if [ -z "$cpu_vcpu" ]; then
+            cpu_vcpu=$(virsh dominfo "$VM" | awk '/^CPU\(s\):/{print $2}')
+        fi
+        _final_quota=$(( cpu_vcpu * _final_period * cpu_percent / 100 ))
+        echo "[cpu] mode=PERCENT $${cpu_percent}% × $${cpu_vcpu} vcpu × $${_final_period}us → quota=$${_final_quota}us"
+    else
+        echo "[cpu] mode=SKIP    (no percent / raw values in .ini)"
+    fi
+
+    if [ -n "$_final_period" ] && [ -n "$_final_quota" ]; then
+        _cmd=(virsh schedinfo "$VM" --live --config
+              --set "vcpu_period=$_final_period"
+              --set "vcpu_quota=$_final_quota")
+        if [ -n "$cpu_shares" ]; then
+            _cmd+=(--set "cpu_shares=$cpu_shares")
+            echo "[cpu] shares=$cpu_shares"
+        fi
+        "$${_cmd[@]}"
+    fi
+fi
+%{ endif ~}
+
+%{ for dev, t in io_limits ~}
+# -----------------------------------------------------------------------------
+# I/O throttle for disk '${dev}'
+# -----------------------------------------------------------------------------
+echo "[*] I/O '${dev}': applying throttle"
+virsh blkdeviotune "$VM" ${dev} --live --config \
+%{ if t.read_bytes_sec != null ~}
+    --read-bytes-sec ${t.read_bytes_sec} \
+%{ endif ~}
+%{ if t.write_bytes_sec != null ~}
+    --write-bytes-sec ${t.write_bytes_sec} \
+%{ endif ~}
+%{ if t.read_iops_sec != null ~}
+    --read-iops-sec ${t.read_iops_sec} \
+%{ endif ~}
+%{ if t.write_iops_sec != null ~}
+    --write-iops-sec ${t.write_iops_sec} \
+%{ endif ~}
+%{ if t.read_bytes_sec_max != null ~}
+    --read-bytes-sec-max ${t.read_bytes_sec_max} \
+%{ endif ~}
+%{ if t.read_bytes_sec_max_length != null ~}
+    --read-bytes-sec-max-length ${t.read_bytes_sec_max_length} \
+%{ endif ~}
+%{ if t.write_bytes_sec_max != null ~}
+    --write-bytes-sec-max ${t.write_bytes_sec_max} \
+%{ endif ~}
+%{ if t.write_bytes_sec_max_length != null ~}
+    --write-bytes-sec-max-length ${t.write_bytes_sec_max_length} \
+%{ endif ~}
+%{ if t.read_iops_sec_max != null ~}
+    --read-iops-sec-max ${t.read_iops_sec_max} \
+%{ endif ~}
+%{ if t.read_iops_sec_max_length != null ~}
+    --read-iops-sec-max-length ${t.read_iops_sec_max_length} \
+%{ endif ~}
+%{ if t.write_iops_sec_max != null ~}
+    --write-iops-sec-max ${t.write_iops_sec_max} \
+%{ endif ~}
+%{ if t.write_iops_sec_max_length != null ~}
+    --write-iops-sec-max-length ${t.write_iops_sec_max_length} \
+%{ endif ~}
+    ; true
+%{ endfor ~}
+
+%{ if length(net_limits) > 0 ~}
+# -----------------------------------------------------------------------------
+# Network bandwidth — per-interface via virsh domiftune.
+# We fetch the libvirt iface target dev (vnet0, vnet1, ...) from domiflist
+# because target names are assigned at runtime.
+# -----------------------------------------------------------------------------
+mapfile -t _QV_IFACES < <(virsh domiflist "$VM" | awk 'NR>2 && NF >= 3 {print $1}')
+%{ for iface, n in net_limits ~}
+if [ -n "$${_QV_IFACES[${iface}]:-}" ]; then
+    _QV_DEV="$${_QV_IFACES[${iface}]}"
+    echo "[*] Net iface[${iface}] ($_QV_DEV): applying bandwidth"
+    virsh domiftune "$VM" "$_QV_DEV" --live --config \
+%{ if n.inbound != null ~}
+        --inbound "${coalesce(try(n.inbound.average, null), 0)},${coalesce(try(n.inbound.peak, null), 0)},${coalesce(try(n.inbound.burst, null), 0)},${coalesce(try(n.inbound.floor, null), 0)}" \
+%{ endif ~}
+%{ if n.outbound != null ~}
+        --outbound "${coalesce(try(n.outbound.average, null), 0)},${coalesce(try(n.outbound.peak, null), 0)},${coalesce(try(n.outbound.burst, null), 0)}" \
+%{ endif ~}
+        ; true
+else
+    echo "[warn] Net iface[${iface}] not found via 'virsh domiflist $VM' — skipping"
+fi
+%{ endfor ~}
+%{ endif ~}
+
+echo "[ok] Limits applied to '$VM'"

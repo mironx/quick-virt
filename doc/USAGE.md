@@ -24,6 +24,7 @@ End-to-end reference for the `quick-virt` Terraform modules with working example
   - [NFS mounts (`nfs_mounts`)](#nfs-mounts-nfs_mounts)
   - [Cloud-init hooks (`run_before`, `run_after`, `user_data_after`)](#cloud-init-hooks-run_before-run_after-user_data_after)
   - [Memory backing](#memory-backing)
+  - [Resource limits — CPU & I/O throttling (`cpu.limit`, `io`)](#resource-limits--cpu--io-throttling-cpulimit-io)
 
 ---
 
@@ -141,7 +142,7 @@ Provisions one KVM domain with cloud-init, dynamic networks, shared folders, and
 | Name | Type | Required | Default | Description |
 |------|------|:---:|---------|-------------|
 | `name` | `string` | yes | — | VM name |
-| `vm_profile` | `object({ vcpu, memory, cpu })` | yes | — | Compute profile (memory in MiB) |
+| `vm_profile` | `object({ vcpu, memory, cpu, io, enable_config, enable_live })` | yes | — | Compute profile + optional CPU/I/O throttling — see [Resource limits](#resource-limits--cpu--io-throttling-cpulimit-io) |
 | `user_data` | `string` | yes | — | Rendered cloud-init `#cloud-config` |
 | `networks` | `list(object)` | no | `[]` | Attached networks (order = interface order) |
 | `kvm-networks` | `map(object)` | no | `{}` | Global enable/disable + optional manual profile override |
@@ -669,3 +670,273 @@ module "vm" {
 ```
 
 Turn `shared = false` only when you're sure you don't use shared folders **and** need the extra hardening.
+
+---
+
+### Resource limits — CPU & I/O throttling (`cpu.limit`, `io`)
+
+Cap how much CPU time and disk I/O a VM can consume — independent from the `vcpu`/`memory` allocation. Useful for reproducing cloud-like resource contention on a dev box, stress-testing apps under slow I/O, or just preventing one noisy VM from starving the host.
+
+```hcl
+vm_profile = {
+  vcpu   = 4
+  memory = 4096
+
+  cpu = {
+    limit = {
+      percent = 25        # 25 % of total allocated CPU capacity (~1 core of 4)
+    }
+  }
+
+  io = {
+    vda = {
+      bytes_unit = "MB"    # interpret *_bytes_sec fields as MB/s
+
+      read_bytes_sec  = 10       #  10 MB/s baseline
+      write_bytes_sec =  5       #   5 MB/s baseline
+      read_iops_sec   = 1000
+      write_iops_sec  = 500
+
+      # burst — short spike above baseline
+      write_bytes_sec_max        = 20    # peak 20 MB/s
+      write_bytes_sec_max_length = 5     # for 5 seconds
+    }
+  }
+
+  enable_config = true    # bake limits into libvirt domain XML (persistent)
+  enable_live   = true    # also write sidecar .ini + .sh for live apply via virsh
+}
+```
+
+See [`examples/example6-vms`](../examples/example6-vms) for a working side-by-side comparison (loose baseline VM + throttled VM + 3-node worker set).
+
+#### CPU limit (`cpu.limit`)
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `percent` | number | — | Percentage of total allocated CPU. `percent = 100` ≈ full allocation, no throttle. |
+| `period_us` | number | `100000` | CFS period in microseconds (kernel scheduler window). |
+| `quota_us` | number | computed from `percent` | CFS quota in microseconds. If set, overrides `percent`. |
+| `shares` | number | libvirt default (1024) | Relative weight under contention (soft priority, not a hard cap). |
+
+Formula: `quota_us = vcpu × period_us × percent / 100`.
+Example: `vcpu=4, percent=25, period_us=100000` → `quota_us=100000` (= 1 core-equivalent).
+
+**INI as the runtime source of truth (`enable_live = true`):**
+
+The sidecar `qv-limits.spec.<vm>.ini` file is re-read by `qv-limits.apply.<vm>.sh` at every invocation. The `[cpu]` section has three possible fields; the script picks a mode based on what's uncommented:
+
+```ini
+[cpu]
+vcpu      = 2              ← always active, needed for percent → quota math
+percent   = 25             ← active by default when you set cpu.limit.percent
+# period_us = 100000       ← uncomment BOTH to force RAW mode
+# quota_us  = 50000        ← uncomment BOTH to force RAW mode
+# shares    =              ← optional relative weight
+```
+
+| INI state | Mode | What `.sh` does |
+|-----------|:---:|---|
+| `percent` active, `period_us` + `quota_us` commented | **PERCENT** | `quota_us = vcpu × period_us × percent / 100`, falls back to `period_us = 100000` if also commented |
+| `period_us` AND `quota_us` both uncommented | **RAW** | Uses values verbatim, ignores `percent` |
+| Nothing uncommented | **SKIP** | CPU section no-op |
+
+The script logs its decision:
+
+```
+[cpu] mode=PERCENT 25% × 2 vcpu × 100000us → quota=50000us
+[cpu] mode=RAW     period=100000us quota=99000us (from .ini)
+[cpu] mode=SKIP    (no percent / raw values in .ini)
+```
+
+**Implication:** edit the `.ini` and re-run `bash qv-limits.apply.<vm>.sh` to change live CPU limits without touching Terraform. (Keep in mind: the next `terraform apply` regenerates the `.ini` from `vm_profile` — persistent changes still belong in HCL.)
+
+**Verify after apply:**
+```bash
+virsh schedinfo <vm-name>            # shows vcpu_period, vcpu_quota, cpu_shares
+```
+
+#### I/O throttle naming convention (`io.<dev>`)
+
+Every parameter decomposes from a predictable pattern:
+
+```
+<direction>_<metric>_sec[_max[_length]][_unit]
+    │            │       │     │         │
+    │            │       │     │         └─ bytes-only: enum B/KB/MB/GB
+    │            │       │     └─── burst duration, always SECONDS
+    │            │       └──────── burst peak (may exceed baseline)
+    │            └──────────────── "bytes" (bandwidth) or "iops" (op count)
+    └───────────────────────────── "read" or "write"
+```
+
+**All fields (each optional):**
+
+| Field | Unit | Role |
+|-------|------|------|
+| `read_bytes_sec` | bytes/s (or `_unit`) | Baseline read bandwidth |
+| `write_bytes_sec` | bytes/s (or `_unit`) | Baseline write bandwidth |
+| `read_iops_sec` | ops/s | Baseline read op rate |
+| `write_iops_sec` | ops/s | Baseline write op rate |
+| `read_bytes_sec_max` | bytes/s (or `_unit`) | Burst peak read bandwidth |
+| `read_bytes_sec_max_length` | **seconds** | How long the read-bytes burst may sustain |
+| `write_bytes_sec_max` | bytes/s (or `_unit`) | Burst peak write bandwidth |
+| `write_bytes_sec_max_length` | **seconds** | Write-bytes burst duration |
+| `read_iops_sec_max` | ops/s | Burst peak read IOPS |
+| `read_iops_sec_max_length` | **seconds** | Read-IOPS burst duration |
+| `write_iops_sec_max` | ops/s | Burst peak write IOPS |
+| `write_iops_sec_max_length` | **seconds** | Write-IOPS burst duration |
+
+**Conventions:**
+
+1. **`_sec` means "per second"** — it is a rate, not a cumulative count. `read_bytes_sec = 10485760` is "10 MB **per second**", not "10 MB total".
+2. **`bytes` vs `iops`** — `bytes` caps **how much data**, `iops` caps **how many operations**. One IO op may transfer 4 KB or 1 MB, so they are independent levers.
+3. **`_unit` applies only to `bytes` fields** — IOPS are dimensionless counts, no multiplier.
+4. **`_max_length` is always seconds** — no `_length_unit` suffix; libvirt only supports seconds.
+5. **Only burst has `_length`** — baseline is "forever at this rate", no duration.
+
+#### Unit multipliers
+
+Byte fields support a unit enum so you can write human-friendly values. Precedence (highest wins):
+
+1. Per-field: `<field>_unit` (e.g. `write_bytes_sec_unit = "KB"`)
+2. Disk-level: `bytes_unit`
+3. Default: `"B"` (raw bytes)
+
+| Unit | Multiplier (binary) |
+|------|--------------------:|
+| `"B"` | 1 |
+| `"KB"` | 1 024 |
+| `"MB"` | 1 048 576 |
+| `"GB"` | 1 073 741 824 |
+
+```hcl
+io = {
+  vda = {
+    bytes_unit      = "MB"
+    read_bytes_sec  = 10               # 10 MB/s
+    write_bytes_sec = 5                #  5 MB/s
+
+    # per-field override — this one stays in KB:
+    write_bytes_sec_max        = 512   # 512 KB/s peak
+    write_bytes_sec_max_unit   = "KB"
+    write_bytes_sec_max_length = 3
+  }
+}
+```
+
+#### Worked example — baseline + burst
+
+```hcl
+io = {
+  vda = {
+    bytes_unit = "MB"
+
+    # Baseline — the sustained rate the VM always gets
+    write_bytes_sec = 5       # 5 MB/s continuous
+
+    # Burst — if idle, VM can spike to 20 MB/s for up to 5 seconds
+    write_bytes_sec_max        = 20
+    write_bytes_sec_max_length = 5
+  }
+}
+```
+
+Translation: *"VM writes up to 20 MB/s for 5 seconds after an idle period, then falls back to 5 MB/s sustained."*
+
+Token-bucket model: tokens accumulate at the baseline rate while idle; a burst spends them faster; once drained the throttle clamps back to baseline until tokens refill.
+
+#### Network bandwidth (`vm_profile.network`)
+
+Per-interface inbound/outbound rate caps via libvirt's native `<bandwidth>` element. Keyed by interface index (matches order of `networks = [...]`).
+
+```hcl
+vm_profile = {
+  # ... cpu, io, enable_* ...
+
+  network = {
+    "0" = {                      # first interface
+      rate_unit = "MB"           # interpret numeric rates as MiB/s (burst as MiB)
+      inbound = {
+        average = 10             # 10 MiB/s sustained download
+        peak    = 50             # 50 MiB/s burst peak
+        burst   = 1              #  1 MiB burst bucket
+      }
+      outbound = {
+        average = 5              # 5 MiB/s sustained upload
+        peak    = 20
+        burst   = 1
+        floor   = 1              # min 1 MiB/s guaranteed (NAT/QoS networks only)
+      }
+    }
+  }
+}
+```
+
+**Direction:** `inbound` = traffic into the VM (download), `outbound` = traffic out (upload).
+
+**Fields (each optional):**
+
+| Field | Unit | Role |
+|-------|------|------|
+| `average` | KiB/s (or `_unit`) | Baseline — sustained rate |
+| `peak` | KiB/s (or `_unit`) | Burst peak — chwilowy szczyt |
+| `burst` | KiB (or `_unit`) | Burst bucket size — how much data at peak in one shot |
+| `floor` | KiB/s (or `_unit`) | Minimum guaranteed rate (outbound only, NAT/QoS networks) |
+
+**Rate units (`rate_unit` and per-field `*_unit`):** `"KB"` (1 KiB), `"MB"` (1024 KiB), `"GB"` (1048576 KiB). Default: `"KB"` — raw libvirt units.
+
+> **Libvirt's base unit is KiB/s** for rates and **KiB** for burst (binary kilobytes). The module converts from user-friendly `rate_unit` to KiB before passing to libvirt.
+
+**Live apply** uses `virsh domiftune` (per-interface, by target dev name which the script resolves from `virsh domiflist`):
+
+```bash
+virsh domiftune <vm> vnet0 \
+  --inbound  "10240,51200,1024,0" \    # avg,peak,burst,floor
+  --outbound "5120,20480,1024" \
+  --live --config
+```
+
+Clear mode zeroes every attached NIC (no-op on NICs that were never throttled).
+
+#### Apply flags
+
+| Flag | Default | Effect |
+|------|---------|--------|
+| `enable_config` | `true` | Inject limits into libvirt domain XML via native `cpu_tune` and `disks[*].io_tune`. Persistent — survives VM restart. |
+| `enable_live` | `false` | Also emit three sidecar files in `./.qv-limits/`: <br>• `qv-limits.spec.<vm>.ini` — spec file, **runtime source of truth for `[cpu]`** (see [CPU limit](#cpu-limit-cpulimit) — the apply script reads it every invocation)<br>• `qv-limits.apply.<vm>.sh` — apply all configured limits live via `virsh schedinfo` + `virsh blkdeviotune` + `virsh domiftune`<br>• `qv-limits.clear.<vm>.sh` — **remove every** CPU/IO/network limit in one shot |
+
+Both flags are independent — you can bake-only, live-only, both, or neither.
+
+**Verifying after apply:**
+
+```bash
+virsh schedinfo <vm-name>                # CPU
+virsh blkdeviotune <vm-name> vda         # I/O (baseline + burst)
+
+# Live re-apply without reboot:
+bash ./.qv-limits/qv-limits.apply.<vm-name>.sh
+
+# Clear all CPU & IO limits on a running VM (rollback / benchmark baseline):
+bash ./.qv-limits/qv-limits.clear.<vm-name>.sh
+```
+
+**Set-level scripts (quick-vms only):**
+
+When a machine set uses `enable_live = true`, `quick-vms` also emits aggregate scripts that fan-out over every node:
+
+```
+./.qv-limits/
+├── qv-limits.apply-all.<set-name>.sh    # bash-loop — applies limits to every node
+└── qv-limits.clear-all.<set-name>.sh    # bash-loop — clears limits on every node
+```
+
+Each script re-uses the per-VM `qv-limits.apply.<vm>.sh` / `qv-limits.clear.<vm>.sh` scripts emitted by `quick-vm`; missing per-VM scripts are skipped with a warning.
+
+```bash
+# One command to throttle the whole 'workers' set:
+bash ./.qv-limits/qv-limits.apply-all.qvms-ex6-worker.sh
+
+# And one to release:
+bash ./.qv-limits/qv-limits.clear-all.qvms-ex6-worker.sh
+```
