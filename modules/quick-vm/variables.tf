@@ -67,8 +67,79 @@ variable "vm_profile" {
     vcpu   = number
     memory = number
     cpu = optional(object({
-       mode = optional(string)
+      mode = optional(string)
+      limit = optional(object({
+        percent   = optional(number)
+        period_us = optional(number)
+        quota_us  = optional(number)
+        shares    = optional(number)
+      }))
     }))
+
+    # Per-disk I/O throttle. Key = <target dev> (e.g. "vda").
+    #
+    # Byte fields support unit multipliers. Precedence (highest wins):
+    #   1. Per-field: <field>_unit   (e.g. write_bytes_sec_unit = "KB")
+    #   2. Disk-level: bytes_unit    (default unit for all *_bytes_sec*)
+    #   3. Default: "B"              (raw bytes)
+    # Valid units: "B" (=1), "KB" (=1024), "MB" (=1048576), "GB" (=1073741824).
+    # *_max_length is always seconds — no unit.
+    io = optional(map(object({
+      bytes_unit                      = optional(string)
+
+      read_bytes_sec                  = optional(number)
+      read_bytes_sec_unit             = optional(string)
+      write_bytes_sec                 = optional(number)
+      write_bytes_sec_unit            = optional(string)
+      read_iops_sec                   = optional(number)
+      write_iops_sec                  = optional(number)
+
+      read_bytes_sec_max              = optional(number)
+      read_bytes_sec_max_unit         = optional(string)
+      read_bytes_sec_max_length       = optional(number)
+      write_bytes_sec_max             = optional(number)
+      write_bytes_sec_max_unit        = optional(string)
+      write_bytes_sec_max_length      = optional(number)
+      read_iops_sec_max               = optional(number)
+      read_iops_sec_max_length        = optional(number)
+      write_iops_sec_max              = optional(number)
+      write_iops_sec_max_length       = optional(number)
+    })))
+
+    # Per-interface network bandwidth throttle. Key = interface index as string
+    # ("0" for networks[0], "1" for networks[1], ...).
+    #
+    # Libvirt native unit is KiB/s for rates and KiB for burst. User values are
+    # multiplied by rate_unit ("KB"=1, "MB"=1024, "GB"=1048576) so you can write
+    # rate_unit="MB" + average=100 to mean "100 MiB/s".
+    network = optional(map(object({
+      rate_unit = optional(string)
+      inbound = optional(object({
+        average      = optional(number)
+        average_unit = optional(string)
+        peak         = optional(number)
+        peak_unit    = optional(string)
+        burst        = optional(number)
+        burst_unit   = optional(string)
+        floor        = optional(number)
+        floor_unit   = optional(string)
+      }))
+      outbound = optional(object({
+        average      = optional(number)
+        average_unit = optional(string)
+        peak         = optional(number)
+        peak_unit    = optional(string)
+        burst        = optional(number)
+        burst_unit   = optional(string)
+        floor        = optional(number)
+        floor_unit   = optional(string)
+      }))
+    })))
+
+    # enable_config: inject <cputune> / <iotune> / <bandwidth> into the domain XML (persistent).
+    # enable_live  : write sidecar .ini + .sh into path.root/.qv-limits/ (for live-apply via virsh).
+    enable_config = optional(bool, true)
+    enable_live   = optional(bool, false)
   })
 }
 

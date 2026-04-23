@@ -8,6 +8,10 @@ terraform {
       source  = "hashicorp/null"
       version = "3.2.3"
     }
+    local = {
+      source  = "hashicorp/local"
+      version = ">= 2.4.0"
+    }
   }
 }
 
@@ -433,8 +437,164 @@ locals {
       model = {
         type = "virtio"
       }
+      bandwidth = local.limits_enable_config && try(local.net_limits[tostring(idx)], null) != null ? {
+        inbound  = local.net_limits[tostring(idx)].inbound
+        outbound = local.net_limits[tostring(idx)].outbound
+      } : null
     }
   ]
+}
+
+//-------------------------------------------------------------------------------
+// Resource limits (CPU throttle + disk I/O throttle)
+//-------------------------------------------------------------------------------
+
+locals {
+  _cpu_limit_raw = try(var.vm_profile.cpu.limit, null)
+
+  _has_cpu_percent = try(local._cpu_limit_raw.percent, null) != null
+  _has_cpu_raw     = try(local._cpu_limit_raw.quota_us, null) != null
+  _has_cpu_shares  = try(local._cpu_limit_raw.shares, null) != null
+
+  cpu_limit_enabled = local._cpu_limit_raw != null && (local._has_cpu_percent || local._has_cpu_raw || local._has_cpu_shares)
+
+  _cpu_period = coalesce(try(local._cpu_limit_raw.period_us, null), 100000)
+  _cpu_quota_from_percent = local._has_cpu_percent ? floor(var.vm_profile.vcpu * local._cpu_period * local._cpu_limit_raw.percent / 100) : null
+
+  _cpu_user_set_period_us = try(local._cpu_limit_raw.period_us, null) != null
+  _cpu_user_set_quota_us  = try(local._cpu_limit_raw.quota_us,  null) != null
+
+  cpu_limit = local.cpu_limit_enabled ? {
+    percent   = try(local._cpu_limit_raw.percent, null)
+    period_us = local._cpu_period
+    quota_us  = coalesce(try(local._cpu_limit_raw.quota_us, null), local._cpu_quota_from_percent, 0) == 0 ? null : coalesce(try(local._cpu_limit_raw.quota_us, null), local._cpu_quota_from_percent)
+    shares    = try(local._cpu_limit_raw.shares, null)
+
+    # Flags for INI template — did the user set raw values explicitly?
+    _user_percent   = local._has_cpu_percent
+    _user_period_us = local._cpu_user_set_period_us
+    _user_quota_us  = local._cpu_user_set_quota_us
+  } : null
+
+  # Unit multipliers. Binary (1024-based) to match libvirt's internal KiB.
+  _byte_units = {
+    B  = 1
+    KB = 1024
+    MB = 1048576
+    GB = 1073741824
+  }
+
+  # Normalize per-disk I/O throttles — convert byte fields to raw bytes using
+  # per-field unit > disk-level bytes_unit > "B".
+  _io_raw = try(var.vm_profile.io, null)
+  io_limits = local._io_raw != null ? {
+    for dev, t in local._io_raw : dev => {
+      read_bytes_sec             = try(t.read_bytes_sec,  null) == null ? null : t.read_bytes_sec  * local._byte_units[coalesce(try(t.read_bytes_sec_unit,  null), try(t.bytes_unit, null), "B")]
+      write_bytes_sec            = try(t.write_bytes_sec, null) == null ? null : t.write_bytes_sec * local._byte_units[coalesce(try(t.write_bytes_sec_unit, null), try(t.bytes_unit, null), "B")]
+      read_iops_sec              = try(t.read_iops_sec,   null)
+      write_iops_sec             = try(t.write_iops_sec,  null)
+      read_bytes_sec_max         = try(t.read_bytes_sec_max,  null) == null ? null : t.read_bytes_sec_max  * local._byte_units[coalesce(try(t.read_bytes_sec_max_unit,  null), try(t.bytes_unit, null), "B")]
+      read_bytes_sec_max_length  = try(t.read_bytes_sec_max_length,  null)
+      write_bytes_sec_max        = try(t.write_bytes_sec_max, null) == null ? null : t.write_bytes_sec_max * local._byte_units[coalesce(try(t.write_bytes_sec_max_unit, null), try(t.bytes_unit, null), "B")]
+      write_bytes_sec_max_length = try(t.write_bytes_sec_max_length, null)
+      read_iops_sec_max          = try(t.read_iops_sec_max,  null)
+      read_iops_sec_max_length   = try(t.read_iops_sec_max_length,  null)
+      write_iops_sec_max         = try(t.write_iops_sec_max, null)
+      write_iops_sec_max_length  = try(t.write_iops_sec_max_length, null)
+    }
+  } : {}
+
+  # Network rate units — libvirt base is KiB (rates KiB/s, burst KiB).
+  _net_units = {
+    KB = 1
+    MB = 1024
+    GB = 1048576
+  }
+
+  _net_raw = try(var.vm_profile.network, null)
+
+  net_limits = local._net_raw != null ? {
+    for iface, cfg in local._net_raw : iface => {
+      inbound = try(cfg.inbound, null) == null ? null : {
+        average = try(cfg.inbound.average, null) == null ? null : cfg.inbound.average * local._net_units[coalesce(try(cfg.inbound.average_unit, null), try(cfg.rate_unit, null), "KB")]
+        peak    = try(cfg.inbound.peak,    null) == null ? null : cfg.inbound.peak    * local._net_units[coalesce(try(cfg.inbound.peak_unit,    null), try(cfg.rate_unit, null), "KB")]
+        burst   = try(cfg.inbound.burst,   null) == null ? null : cfg.inbound.burst   * local._net_units[coalesce(try(cfg.inbound.burst_unit,   null), try(cfg.rate_unit, null), "KB")]
+        floor   = try(cfg.inbound.floor,   null) == null ? null : cfg.inbound.floor   * local._net_units[coalesce(try(cfg.inbound.floor_unit,   null), try(cfg.rate_unit, null), "KB")]
+      }
+      outbound = try(cfg.outbound, null) == null ? null : {
+        average = try(cfg.outbound.average, null) == null ? null : cfg.outbound.average * local._net_units[coalesce(try(cfg.outbound.average_unit, null), try(cfg.rate_unit, null), "KB")]
+        peak    = try(cfg.outbound.peak,    null) == null ? null : cfg.outbound.peak    * local._net_units[coalesce(try(cfg.outbound.peak_unit,    null), try(cfg.rate_unit, null), "KB")]
+        burst   = try(cfg.outbound.burst,   null) == null ? null : cfg.outbound.burst   * local._net_units[coalesce(try(cfg.outbound.burst_unit,   null), try(cfg.rate_unit, null), "KB")]
+        floor   = try(cfg.outbound.floor,   null) == null ? null : cfg.outbound.floor   * local._net_units[coalesce(try(cfg.outbound.floor_unit,   null), try(cfg.rate_unit, null), "KB")]
+      }
+    }
+  } : {}
+
+  limits_enable_config = try(var.vm_profile.enable_config, true)
+  limits_enable_live   = try(var.vm_profile.enable_live, false)
+
+  has_any_limit = local.cpu_limit_enabled || length(local.io_limits) > 0 || length(local.net_limits) > 0
+
+  # ----------------------- Native provider attrs (enable_config = true) -----------------------
+  # cpu_tune payload for libvirt_domain.cpu_tune (omit when limits disabled)
+  native_cpu_tune = local.limits_enable_config && local.cpu_limit_enabled ? {
+    period = local.cpu_limit.period_us
+    quota  = local.cpu_limit.quota_us
+    shares = local.cpu_limit.shares
+  } : null
+
+  # Per-disk io_tune — goes INSIDE disks[*] (supports baseline + burst natively
+  # on qcow2 files). For v1 we throttle only the main disk (target dev='vda').
+  _io_vda = try(local.io_limits["vda"], null)
+  native_io_tune_vda = local.limits_enable_config && local._io_vda != null ? {
+    read_bytes_sec             = local._io_vda.read_bytes_sec
+    write_bytes_sec            = local._io_vda.write_bytes_sec
+    read_iops_sec              = local._io_vda.read_iops_sec
+    write_iops_sec             = local._io_vda.write_iops_sec
+    read_bytes_sec_max         = local._io_vda.read_bytes_sec_max
+    read_bytes_sec_max_length  = local._io_vda.read_bytes_sec_max_length
+    write_bytes_sec_max        = local._io_vda.write_bytes_sec_max
+    write_bytes_sec_max_length = local._io_vda.write_bytes_sec_max_length
+    read_iops_sec_max          = local._io_vda.read_iops_sec_max
+    read_iops_sec_max_length   = local._io_vda.read_iops_sec_max_length
+    write_iops_sec_max         = local._io_vda.write_iops_sec_max
+    write_iops_sec_max_length  = local._io_vda.write_iops_sec_max_length
+  } : null
+
+  # ----------------------- Sidecar files (for enable_live = true) -----------------------
+  limits_ini = local.has_any_limit && local.limits_enable_live ? templatefile(
+    "${path.module}/templates/limits-spec.ini.tmpl",
+    {
+      vm_name            = var.name
+      vcpu               = var.vm_profile.vcpu
+      generated_at       = formatdate("YYYY-MM-DD'T'hh:mm:ss'Z'", timestamp())
+      quick_virt_version = "dev"
+      enable_config      = local.limits_enable_config
+      enable_live        = local.limits_enable_live
+      cpu_limit          = local.cpu_limit
+      io_limits          = local.io_limits
+      net_limits         = local.net_limits
+    }
+  ) : ""
+
+  limits_sh = local.has_any_limit && local.limits_enable_live ? templatefile(
+    "${path.module}/templates/limits-apply.sh.tmpl",
+    {
+      vm_name    = var.name
+      cpu_limit  = local.cpu_limit
+      io_limits  = local.io_limits
+      net_limits = local.net_limits
+    }
+  ) : ""
+
+  # Clear-all counterpart — emitted whenever enable_live is on, independent of
+  # whether limits are currently configured. Handy to roll back an experiment.
+  limits_sh_clear = local.limits_enable_live ? templatefile(
+    "${path.module}/templates/limits-clear.sh.tmpl",
+    {
+      vm_name = var.name
+    }
+  ) : ""
 }
 
 //-------------------------------------------------------------------------------
@@ -488,6 +648,7 @@ resource "libvirt_domain" "vm" {
           name = "qemu"
           type = "qcow2"
         }
+        io_tune = local.native_io_tune_vda
       },
       {
         source = {
@@ -563,9 +724,43 @@ resource "libvirt_domain" "vm" {
   autostart   = local.autostart
   description = local.description
 
+  cpu_tune = local.native_cpu_tune
+
   depends_on = [
     libvirt_volume.vm-disk-thin,
     libvirt_volume.vm-disk-clone,
     libvirt_volume.cloudinit,
   ]
+}
+
+//-------------------------------------------------------------------------------
+// Sidecar limit files (enable_live)
+//-------------------------------------------------------------------------------
+
+resource "local_file" "limits_ini" {
+  count           = local.limits_ini != "" ? 1 : 0
+  filename        = "${path.root}/.qv-limits/qv-limits.spec.${var.name}.ini"
+  content         = local.limits_ini
+  file_permission = "0644"
+}
+
+resource "local_file" "limits_sh" {
+  count           = local.limits_sh != "" ? 1 : 0
+  filename        = "${path.root}/.qv-limits/qv-limits.apply.${var.name}.sh"
+  content         = local.limits_sh
+  file_permission = "0755"
+}
+
+resource "local_file" "limits_sh_clear" {
+  count           = local.limits_sh_clear != "" ? 1 : 0
+  filename        = "${path.root}/.qv-limits/qv-limits.clear.${var.name}.sh"
+  content         = local.limits_sh_clear
+  file_permission = "0755"
+}
+
+resource "local_file" "limits_gitignore" {
+  count           = (local.limits_ini != "" || local.limits_sh != "" || local.limits_sh_clear != "") ? 1 : 0
+  filename        = "${path.root}/.qv-limits/.gitignore"
+  content         = "*\n!.gitignore\n"
+  file_permission = "0644"
 }
