@@ -58,27 +58,31 @@ trap 'rm -rf "$tmp"' EXIT
 curl -fsSL "$ARCHIVE_URL" -o "$tmp/archive.tar.gz" \
     || die "Failed to download ${ARCHIVE_URL}"
 
-# Strip the top-level 'quick-virt-<ref>/' prefix and keep only the CLI bits:
-#   - Taskfile.yml
-#   - scripts/
-#   - modules/quick-kvm-network-reader/scripts  (needed by the 'net:info' task)
-tar -xz -C "$tmp" -f "$tmp/archive.tar.gz" \
-    --strip-components=1 \
-    --wildcards \
-    '*/Taskfile.yml' \
-    '*/scripts' \
-    '*/modules/quick-kvm-network-reader/scripts' \
+# Extract the full archive to a staging dir (strip the top-level 'quick-virt-<ref>/' prefix).
+# Pattern-filtering inside tar is unreliable with GitHub-generated tarballs — they don't
+# always include standalone directory entries, so '*/modules/.../scripts' fails to match.
+# Extract everything, then cherry-pick what we need.
+mkdir -p "$tmp/src"
+tar -xz -C "$tmp/src" --strip-components=1 -f "$tmp/archive.tar.gz" \
     || die "Tarball extraction failed"
 
 # ---------------------------------------------------------------- install
+[ -f "$tmp/src/Taskfile.yml" ] || die "Taskfile.yml missing from ${QV_VERSION} tarball"
+[ -d "$tmp/src/scripts" ]      || die "scripts/ missing from ${QV_VERSION} tarball"
+
 mkdir -p "$PREFIX" "$BIN_DIR"
 rm -rf "$PREFIX/Taskfile.yml" "$PREFIX/scripts" "$PREFIX/modules"
 
-cp    "$tmp/Taskfile.yml" "$PREFIX/Taskfile.yml"
-cp -r "$tmp/scripts"      "$PREFIX/scripts"
-mkdir -p "$PREFIX/modules/quick-kvm-network-reader"
-cp -r "$tmp/modules/quick-kvm-network-reader/scripts" \
-      "$PREFIX/modules/quick-kvm-network-reader/scripts"
+cp    "$tmp/src/Taskfile.yml" "$PREFIX/Taskfile.yml"
+cp -r "$tmp/src/scripts"      "$PREFIX/scripts"
+
+if [ -d "$tmp/src/modules/quick-kvm-network-reader/scripts" ]; then
+    mkdir -p "$PREFIX/modules/quick-kvm-network-reader"
+    cp -r "$tmp/src/modules/quick-kvm-network-reader/scripts" \
+          "$PREFIX/modules/quick-kvm-network-reader/scripts"
+else
+    warn "modules/quick-kvm-network-reader/scripts not in ${QV_VERSION} — 'net:info' task will not work"
+fi
 
 echo "$QV_VERSION" > "$PREFIX/.version"
 
