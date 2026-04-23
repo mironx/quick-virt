@@ -157,6 +157,7 @@ module "vms" {
         fs_type         = set_val.fs_type
         memory_backing  = set_val.memory_backing
         shared_folders  = set_val.shared_folders
+        nfs_mounts      = set_val.nfs_mounts
         node         = node
       }
     }
@@ -179,6 +180,7 @@ module "vms" {
   fs_type         = each.value.fs_type
   memory_backing  = each.value.memory_backing
   shared_folders  = each.value.shared_folders
+  nfs_mounts      = each.value.nfs_mounts
 
   networks = [
     for net in each.value.node.networks : {

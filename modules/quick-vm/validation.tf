@@ -111,3 +111,25 @@ resource "null_resource" "validate_shared_folders" {
   }
   depends_on = [null_resource.validate]
 }
+
+resource "null_resource" "validate_nfs_mounts" {
+  for_each = { for idx, m in var.nfs_mounts : tostring(idx) => m }
+
+  lifecycle {
+    precondition {
+      condition     = each.value.host != null && each.value.host != ""
+      error_message = "NFS mount host must not be empty [vm_name:${var.name}, target:${each.value.target}]"
+    }
+
+    precondition {
+      condition     = each.value.source != null && each.value.source != ""
+      error_message = "NFS mount source path must not be empty [vm_name:${var.name}, target:${each.value.target}]"
+    }
+
+    precondition {
+      condition     = each.value.target != null && each.value.target != ""
+      error_message = "NFS mount target (mount point name) must not be empty [vm_name:${var.name}]"
+    }
+  }
+  depends_on = [null_resource.validate]
+}

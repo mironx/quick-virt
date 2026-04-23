@@ -76,6 +76,13 @@ variable "machines" {
       read_only = optional(bool, false)
     })), [])
 
+    nfs_mounts = optional(list(object({
+      host    = string
+      source  = string
+      target  = string
+      options = optional(string, "defaults")
+    })), [])
+
     nodes = list(object({
       name        = string
       description = optional(string)

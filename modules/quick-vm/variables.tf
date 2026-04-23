@@ -198,3 +198,14 @@ variable "shared_folders" {
   }))
   default = []
 }
+
+variable "nfs_mounts" {
+  description = "List of NFS shares to mount in the VM. Each entry becomes /mnt/<target>."
+  type = list(object({
+    host    = string
+    source  = string
+    target  = string
+    options = optional(string, "defaults")
+  }))
+  default = []
+}

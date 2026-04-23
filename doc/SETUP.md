@@ -37,6 +37,19 @@ Tasks are listed in the typical order you would run them — from host preparati
 | 5 | `task setup:enable-shared-folders-for USER=devx` | Same as above but for a specific user | When configuring shared folders on behalf of another user account. |
 | 6 | `task setup:disable-shared-folders` | Removes `libvirt-qemu` from your group | Rollback of step 4. |
 | 7 | `task setup:disable-shared-folders-for USER=devx` | Removes access for a specific user | Rollback of step 5. |
+| 8 | `task setup:install-nfs-server` | Installs and enables the NFS server (`nfs-kernel-server` on Debian/Ubuntu, `nfs-utils` on Rocky) | Required once before using VMs with the `nfs_mounts` variable. |
+| 9 | `task setup:configure-nfs-export DIR=… CIDR=…` | Creates the directory, sets ownership, and adds an idempotent entry to `/etc/exports` | After step 8 — declares **what** gets exported and **who** can mount it. See parameters below. |
+
+**`setup:configure-nfs-export` parameters:**
+
+| Name | Required | Default | Example |
+|------|:---:|---------|---------|
+| `DIR` | ✓ | — | `/home/devx/vm-shares` |
+| `CIDR` | ✓ | — | `192.168.100.0/24` |
+| `OPTIONS` | — | `rw,sync,no_subtree_check,no_root_squash` | `ro,sync,no_subtree_check` |
+| `OWNER` | — | caller's `user:group` (or `SUDO_USER`) | `devx:devx` |
+
+Idempotent — an existing entry for the same `DIR` is replaced. Runs `exportfs -ra` and prints the active exports.
 
 ### 2. OS images
 

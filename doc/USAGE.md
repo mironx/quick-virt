@@ -21,6 +21,7 @@ End-to-end reference for the `quick-virt` Terraform modules with working example
   - [Networks (static, DHCP, profile_name)](#networks-static-dhcp-profile_name)
   - [Global network on/off (`kvm-networks`)](#global-network-onoff-kvm-networks)
   - [Shared folders (virtiofs vs 9p)](#shared-folders-virtiofs-vs-9p)
+  - [NFS mounts (`nfs_mounts`)](#nfs-mounts-nfs_mounts)
   - [Cloud-init hooks (`run_before`, `run_after`, `user_data_after`)](#cloud-init-hooks-run_before-run_after-user_data_after)
   - [Memory backing](#memory-backing)
 
@@ -148,6 +149,7 @@ Provisions one KVM domain with cloud-init, dynamic networks, shared folders, and
 | `os_disk_mode` | `string` | no | `"backing_store"` | `"backing_store"` or `"clone"` |
 | `fs_type` | `string` | no | `"virtiofs"` | Shared-folder driver: `"virtiofs"` or `"9p"` |
 | `shared_folders` | `list(object)` | no | `[]` | Host dirs to mount: `{ source, target, read_only }` |
+| `nfs_mounts` | `list(object)` | no | `[]` | NFS shares to mount: `{ host, source, target, options }` — see [NFS mounts](#nfs-mounts-nfs_mounts) |
 | `run_before` | `list(string)` | no | `[]` | Commands run very early (after hostname) |
 | `run_after` | `list(string)` | no | `[]` | Commands run after shared folders mount |
 | `user_data_after` | `string` | no | `null` | Extra `#cloud-config` appended after shared folders |
@@ -472,12 +474,144 @@ See [`examples/example3c-vm`](../examples/example3c-vm) (VMs F1/F2) and [`exampl
 
 ---
 
+### NFS mounts (`nfs_mounts`)
+
+When `virtiofs` / `9p` don't fit — e.g. you need the same share **across many hosts**, Rocky Linux 9 (no 9p kernel module), or you want a less capricious driver — use `nfs_mounts`. The module generates a cloud-init fragment that installs the NFS client, declares the mount in `/etc/fstab`, and mounts it on first boot. **Nothing about NFS leaks into your `user_data` template.**
+
+**Input shape**
+
+```hcl
+nfs_mounts = [
+  {
+    host    = "172.16.0.1"              # NFS server IP or hostname
+    source  = "/home/devx/vm-shares"    # path exported by the NFS server
+    target  = "vm-shares"               # → mounted at /mnt/vm-shares in the VM
+    options = "defaults"                # optional (default: "defaults")
+  }
+]
+```
+
+| Field | Required | Default | Notes |
+|-------|:---:|---------|-------|
+| `host` | ✓ | — | NFS server IP/hostname reachable from the VM |
+| `source` | ✓ | — | Absolute path exported by the server (must match `/etc/exports`) |
+| `target` | ✓ | — | Mount-point name — always lands at `/mnt/<target>` in the VM |
+| `options` | — | `defaults` | Any `mount -t nfs` options (e.g. `"ro,soft,timeo=30"`) |
+
+**Pre-flight (one-time on the host)**
+
+1. Install the NFS server:
+   ```bash
+   task setup:install-nfs-server
+   ```
+2. Configure the export (creates the directory, sets ownership, updates `/etc/exports`, runs `exportfs -ra`):
+   ```bash
+   task setup:configure-nfs-export DIR=/home/$USER/vm-shares CIDR=192.168.100.0/24
+   ```
+   Parameters: `DIR` (abs path, required) · `CIDR` (network allowed to mount, required) · `OPTIONS` (NFS export options, default `rw,sync,no_subtree_check,no_root_squash`) · `OWNER` (`user:group`, default = caller). The task is idempotent — re-running it replaces the existing entry for `DIR`.
+3. Verify from another machine:
+   ```bash
+   showmount -e <host-ip>
+   ```
+
+**Single-VM example**
+
+```hcl
+module "vm_nfs" {
+  source     = "git::https://github.com/mironx/quick-virt.git//modules/quick-vm?ref=main"
+  name       = "demo-nfs"
+  os_name    = "ubuntu_22"
+  user_data  = local.user_data
+  vm_profile = { vcpu = 1, memory = 2048 }
+
+  nfs_mounts = [
+    { host = "172.16.0.1", source = "/home/devx/vm-shares", target = "vm-shares" }
+  ]
+  run_after = [
+    "mountpoint -q /mnt/vm-shares && echo ready > /mnt/vm-shares/${var.name}.ok",
+  ]
+
+  networks = [
+    { profile_name = "neta-loc-1", ip = "192.168.100.70" }
+  ]
+}
+```
+
+After `terraform apply` and first boot, inside the VM:
+
+```bash
+$ mountpoint /mnt/vm-shares
+/mnt/vm-shares is a mountpoint
+$ ls /mnt/vm-shares
+demo-nfs.ok
+```
+
+**Multi-VM example (`quick-vms`)**
+
+`nfs_mounts` is available at the **set** level — every node in the set gets the same mount:
+
+```hcl
+module "cluster" {
+  source       = "git::https://github.com/mironx/quick-virt.git//modules/quick-vms?ref=main"
+  kvm-networks = { "neta-loc-2" = { enabled = true } }
+
+  machines = {
+    workers = {
+      set_name   = "demo-worker"
+      os_name    = "ubuntu_22"
+      vm_profile = { vcpu = 2, memory = 4096 }
+      user       = { name = "ubuntu", password = "ubuntu123" }
+      cloud_init_user_data_path = "./templates/worker-user-data.tmpl"
+
+      nfs_mounts = [
+        { host = "172.16.0.1", source = "/home/devx/vm-shares", target = "vm-shares" }
+      ]
+
+      nodes = [
+        { name = "v1", networks = [{ profile_name = "neta-loc-2", ip = "192.168.201.70" }] },
+        { name = "v2", networks = [{ profile_name = "neta-loc-2", ip = "192.168.201.71" }] },
+      ]
+    }
+  }
+}
+```
+
+**What the module does under the hood**
+
+A `nfs-mounts.cfg` MIME fragment is injected into cloud-init (between `shared-folders.cfg` and `run-after.cfg`):
+
+```yaml
+#cloud-config
+merge_how: [{ name: list, settings: [append] }, { name: dict, settings: [no_replace, recurse_list] }]
+packages:
+  - nfs-common        # or nfs-utils on Rocky 9 — picked automatically from os_name
+mounts:
+  - [ "172.16.0.1:/home/devx/vm-shares", "/mnt/vm-shares", "nfs", "defaults", "0", "0" ]
+runcmd:
+  - mkdir -p /mnt/vm-shares
+  - mount -a
+```
+
+You never see it — keep your `user_data.tmpl` focused on app-level concerns.
+
+**When to pick NFS over virtiofs/9p**
+
+| Need | Pick |
+|------|------|
+| Fastest read/write, laptop/dev box | `virtiofs` |
+| Works on Ubuntu/Debian, no host daemon install | `9p` |
+| Works on **Rocky Linux 9** | `virtiofs` or `nfs_mounts` (not `9p`) |
+| Shared between **multiple hosts** (not just this KVM host) | `nfs_mounts` |
+| User wants "just mount it, I don't care about micro-optimisations" | `nfs_mounts` |
+
+---
+
 ### Cloud-init hooks (`run_before`, `run_after`, `user_data_after`)
 
 The module builds a **multipart MIME cloud-init** so you can inject commands without rewriting your `user_data` template. Order of execution:
 
 ```
-hostname → run_before → user_data → shared-folders mount → run_after → user_data_after
+hostname → run_before → user_data → shared-folders mount → nfs-mounts → run_after → user_data_after
 ```
 
 #### `run_before` / `run_after` — quick command lists

@@ -202,9 +202,10 @@ locals {
   # 1. hostname (always, auto-generated)
   # 2. run_before (optional — commands before user_data)
   # 3. user_data (user template — users, packages, base runcmd)
-  # 4. shared-folders (auto, if shared_folders > 0 — modprobe, mkdir, mount)
-  # 5. run_after (optional — commands after shared folders mount)
-  # 6. user_data_after (optional — full cloud-config after everything)
+  # 4. shared-folders (auto, if shared_folders > 0 — modprobe, mkdir, mount virtiofs/9p)
+  # 5. nfs-mounts (auto, if nfs_mounts > 0 — install nfs client, mkdir, mount -a)
+  # 6. run_after (optional — commands after shared folders/nfs mount)
+  # 7. user_data_after (optional — full cloud-config after everything)
 
   _mime_hostname = templatefile("${path.module}/templates/cloud-config-hostname.tmpl", {
     hostname = var.name
@@ -220,6 +221,20 @@ locals {
     "${path.module}/templates/cloud-config-shared-folders.tmpl", {
       shared_folders = var.shared_folders
       fs_type        = local.fs_type
+    }
+  ) : ""
+
+  # NFS package: rocky_9 → nfs-utils, everything else → nfs-common
+  _nfs_package = (
+    coalesce(var.os_name, try(var.os_volume.os_name, "ubuntu_22")) == "rocky_9"
+    ? "nfs-utils"
+    : "nfs-common"
+  )
+
+  _mime_nfs_mounts = length(var.nfs_mounts) > 0 ? templatefile(
+    "${path.module}/templates/cloud-config-nfs-mounts.tmpl", {
+      nfs_mounts  = var.nfs_mounts
+      nfs_package = local._nfs_package
     }
   ) : ""
 
@@ -241,6 +256,9 @@ locals {
     ],
     length(var.shared_folders) > 0 ? [
       { filename = "shared-folders.cfg", content = trimspace(local._mime_shared_folders) },
+    ] : [],
+    length(var.nfs_mounts) > 0 ? [
+      { filename = "nfs-mounts.cfg", content = trimspace(local._mime_nfs_mounts) },
     ] : [],
     length(var.run_after) > 0 ? [
       { filename = "run-after.cfg", content = trimspace(local._mime_run_after) },

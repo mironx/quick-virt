@@ -159,3 +159,23 @@ module "vm_F2" {
     { profile_name = "qvexample-net-bridge", ip = "172.16.0.45" }
   ]
 }
+
+module "vm_F3" {
+  source       = "../../../../modules/quick-vm"
+  name         = "${var.prefix}-rocky9-F3"
+  os_volume    = module.base_rocky_9.volume
+  os_disk_mode = "backing_store"
+  user_data    = var.user_data
+  vm_profile   = var.vm_profile
+  kvm-networks = var.kvm_networks
+  nfs_mounts = [
+    { host = "192.168.200.1", source = "/home/devx/vm-shares", target = "vm-shares" }
+  ]
+  run_after = [
+    "mountpoint -q /mnt/vm-shares 2>/dev/null && echo ready > /mnt/vm-shares/${var.prefix}-F3.txt",
+  ]
+  networks = [
+    { profile_name = "qvexample-neta-loc-1", ip = "192.168.200.62" },
+    { profile_name = "qvexample-net-bridge", ip = "172.16.0.62" }
+  ]
+}

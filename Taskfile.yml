@@ -39,6 +39,19 @@ tasks:
     desc: Check virtiofs and 9p driver availability on the host
     cmd: '{{.SCRIPTS_DIR}}/tools/check-shared-folders-drivers.sh'
 
+  setup:install-nfs-server:
+    desc: Install and enable the NFS server (nfs-kernel-server on Debian/Ubuntu, nfs-utils on Rocky)
+    cmd: sudo {{.SCRIPTS_DIR}}/setup/install-nfs-server.sh
+
+  setup:configure-nfs-export:
+    desc: 'Configure an NFS export (requires DIR, CIDR; optional OPTIONS, OWNER). Example{{":"}} task setup:configure-nfs-export DIR=/home/$USER/vm-shares CIDR=192.168.100.0/24'
+    cmd: sudo {{.SCRIPTS_DIR}}/setup/configure-nfs-export.sh "{{.DIR}}" "{{.CIDR}}" "{{.OPTIONS}}" "{{.OWNER}}"
+    vars:
+      OPTIONS: '{{.OPTIONS | default "rw,sync,no_subtree_check,no_root_squash"}}'
+      OWNER: '{{.OWNER | default ""}}'
+    requires:
+      vars: [DIR, CIDR]
+
   # ---------------------------------------------------------------------------
   # Linux Bridge
   # ---------------------------------------------------------------------------
