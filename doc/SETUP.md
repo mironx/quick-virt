@@ -24,7 +24,7 @@ echo 'eval "$(task --completion zsh)"' >> ~/.zshrc
 
 ## Available Tasks
 
-Tasks are listed in the typical order you would run them — from host preparation, through image download, to VM lifecycle and cleanup.
+Tasks are listed in the typical order you would run them — from host preparation, through image download, to creating KVM networks, the VM lifecycle, and cleanup.
 
 ### 1. Host preparation (one-time)
 
@@ -64,7 +64,41 @@ Idempotent — an existing entry for the same `DIR` is replaced. Runs `exportfs 
 | 7 | `task images:remove:ubuntu22` | Removes a single downloaded image | When you want to force a re-download or free disk space. |
 | 8 | `task images:remove:all` | Removes all downloaded images | Full cleanup of the local image cache. |
 
-### 3. Linux bridge (only for bridge-mode networks)
+### 3. Create KVM networks (Terraform — one-time per environment)
+
+The `quick-vm` / `quick-vms` modules attach VMs to libvirt networks by name (`profile_name = "qvexample-neta-loc-1"`). **These networks must exist before you apply any VM example** — otherwise `terraform apply` fails with *"network not found"*.
+
+Creating networks is a Terraform operation, done via the [`quick-networks`](../modules/quick-networks) module. Two paths:
+
+**Scaffold a project in your own directory (recommended):**
+
+```bash
+task scaffold:init-networks DIR=./my-networks
+cd ./my-networks
+terraform init
+terraform apply
+```
+
+`scaffold:init-networks` writes `main.tf`, `variables.tf`, and `networks.auto.tfvars` pinned to the currently-installed `quick-virt` version. The generated `networks.auto.tfvars` ships with one NAT network active and a second NAT + bridge commented out — edit to taste.
+
+**Or apply the ready-made example in-repo:**
+
+```bash
+cd examples/example1-network
+terraform init
+terraform apply -var-file=networks.auto.tfvars
+```
+
+See [`doc/USAGE.md`](./USAGE.md#quick-networks--kvm-networks) for the full input schema.
+
+Useful helpers once networks exist:
+
+| Task | What it does |
+|------|--------------|
+| `task net:info NET=qvexample-neta-loc-1` | Print resolved parameters (CIDR, gateway, DHCP range) of an existing libvirt network |
+| `task tools:clean-networks` | Destroy **every** libvirt network on the host (emergency cleanup) |
+
+### 4. Linux bridge (only for bridge-mode networks)
 
 | # | Task | What it does | When to run |
 |---|------|--------------|-------------|
@@ -73,20 +107,21 @@ Idempotent — an existing entry for the same `DIR` is replaced. Runs `exportfs 
 | 3 | `task bridge:create PHYS_IF=enp0s31f6 BRIDGE_NAME=br0` | Creates a Linux bridge tied to a physical interface | Required once, before using bridge-mode networks in Terraform. |
 | 4 | `task bridge:restore` | Restores host networking after a bridge is torn down | Recovery — if the bridge broke your connectivity. |
 
-### 4. KVM network info
+### 5. KVM network info
 
 | # | Task | What it does | When to run |
 |---|------|--------------|-------------|
 | 1 | `task net:info NET=neta-loc-1` | Prints parameters (CIDR, DHCP range, etc.) for a libvirt network | When you need the real values of an existing network. |
 | 2 | `task net:test` | Runs the network reader smoke tests | After changing the `quick-kvm-network-reader` module. |
 
-### 5. Cleanup tools
+### 6. Cleanup tools
 
 | # | Task | What it does | When to run |
 |---|------|--------------|-------------|
 | 1 | `task tools:clean-vms` | Destroys every libvirt VM on the host | Emergency cleanup when `terraform destroy` can't recover the state. |
 | 2 | `task tools:clean-networks` | Destroys every libvirt network on the host | Same — for orphan networks. |
-| 3 | `task tools:init-cloud-config DIR=./templates` | Creates a cloud-init `user-data` template with your SSH key | Once per new example — bootstraps the cloud-init template. |
+| 3 | `task scaffold:init-cloud-config DIR=./templates` | Creates a cloud-init `user-data` template with your SSH key | Once per new example — bootstraps the cloud-init template. |
+| 4 | `task scaffold:init-networks DIR=./my-networks` | Scaffolds a Terraform project for KVM networks (pinned to installed version) | Once per environment — see step 3 of this guide. |
 
 ## Scripts
 
@@ -95,7 +130,8 @@ Shell scripts that back the tasks (you can also invoke them directly):
 | Script | Description |
 |--------|-------------|
 | `scripts/tools/get-os-image.sh` | Download, list, and remove OS cloud images |
-| `scripts/tools/init-cloud-config.sh` | Create cloud-init user-data template with SSH key |
+| `scripts/scaffold/init-cloud-config.sh` | Create cloud-init user-data template with SSH key |
+| `scripts/scaffold/init-networks.sh` | Scaffold a Terraform project for KVM networks |
 | `scripts/tools/clean-all-vms.sh` | Remove all VMs from libvirt |
 | `scripts/tools/clean-kvm-network.sh` | Remove all KVM networks |
 | `scripts/tools/check-shared-folders-drivers.sh` | Check `virtiofs` and `9p` driver availability |
