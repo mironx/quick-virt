@@ -1,0 +1,20 @@
+#cloud-config
+merge_how:
+ - name: list
+   settings: [append]
+ - name: dict
+   settings: [no_replace, recurse_list]
+
+packages:
+  - ${nfs_package}
+
+mounts:
+%{ for m in nfs_mounts ~}
+  - [ "${m.host}:${m.source}", "/mnt/${m.target}", "nfs", "${m.options}", "0", "0" ]
+%{ endfor ~}
+
+runcmd:
+%{ for m in nfs_mounts ~}
+  - mkdir -p /mnt/${m.target}
+%{ endfor ~}
+  - mount -a

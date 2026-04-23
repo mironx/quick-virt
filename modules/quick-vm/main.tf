@@ -23,6 +23,7 @@ locals {
       network_template = "netplan"
       interface_naming = "enp0s"
       interface_offset = 3
+      fs_type          = "virtiofs"
     }
     ubuntu_24 = {
       image_local      = "/var/lib/libvirt/images/ubuntu-2404.qcow2.base"
@@ -30,6 +31,7 @@ locals {
       network_template = "netplan"
       interface_naming = "enp0s"
       interface_offset = 3
+      fs_type          = "virtiofs"
     }
     rocky_9 = {
       image_local      = "/var/lib/libvirt/images/rocky-9.qcow2.base"
@@ -37,6 +39,7 @@ locals {
       network_template = "networkmanager"
       interface_naming = "eth"
       interface_offset = 0
+      fs_type          = "virtiofs"
     }
     debian_12 = {
       image_local      = "/var/lib/libvirt/images/debian-12.qcow2.base"
@@ -44,6 +47,7 @@ locals {
       network_template = "netplan"
       interface_naming = "enp0s"
       interface_offset = 3
+      fs_type          = "virtiofs"
     }
   }
 
@@ -57,11 +61,13 @@ locals {
       network_template = var.os_profile.network_template
       interface_naming = var.os_profile.interface_naming
       interface_offset = try(var.os_profile.interface_offset, 3)
+      fs_type          = try(var.os_profile.fs_type, "virtiofs")
     } : {
       image            = var.os_image_mode == "local" ? local._builtin_os.image_local : local._builtin_os.image_url
       network_template = local._builtin_os.network_template
       interface_naming = local._builtin_os.interface_naming
       interface_offset = local._builtin_os.interface_offset
+      fs_type          = local._builtin_os.fs_type
     }
   )
 }
@@ -160,6 +166,7 @@ locals {
   }
 
   validated_user_data = yamldecode(var.user_data)
+
 }
 
 //-------------------------------------------------------------------------------
@@ -172,7 +179,12 @@ locals {
     {
       networks = [
         for idx, n in local.resolved_networks : {
-          interface   = "${local.selected_os.interface_naming}${idx + local.selected_os.interface_offset}"
+          # For PCI-slot-based naming (enp0s*): shared_folders (9p filesystems) occupy
+          # PCI slots before network interfaces, shifting slot numbers by +1 per folder.
+          # For kernel-order naming (eth*): slot position doesn't affect naming.
+          interface = "${local.selected_os.interface_naming}${idx + local.selected_os.interface_offset + (
+            local.selected_os.interface_naming == "eth" ? 0 : length(var.shared_folders)
+          )}"
           ip          = n.ip
           mask        = try(n.profile.mask, "")
           gateway4    = try(n.profile.gateway4, "")
@@ -183,7 +195,98 @@ locals {
     }
   )
 
-  user_data = replace(var.user_data, "HOST_NAME", var.name)
+  # Priority: var.fs_type > os_profile.fs_type > os_name builtin
+  fs_type = coalesce(var.fs_type, local.selected_os.fs_type)
+
+  # Cloud-init multipart MIME fragments (in order):
+  # 1. hostname (always, auto-generated)
+  # 2. run_before (optional — commands before user_data)
+  # 3. user_data (user template — users, packages, base runcmd)
+  # 4. shared-folders (auto, if shared_folders > 0 — modprobe, mkdir, mount virtiofs/9p)
+  # 5. nfs-mounts (auto, if nfs_mounts > 0 — install nfs client, mkdir, mount -a)
+  # 6. run_after (optional — commands after shared folders/nfs mount)
+  # 7. user_data_after (optional — full cloud-config after everything)
+
+  _mime_hostname = templatefile("${path.module}/templates/cloud-config-hostname.tmpl", {
+    hostname = var.name
+  })
+
+  _mime_run_before = length(var.run_before) > 0 ? templatefile(
+    "${path.module}/templates/cloud-config-runcmd.tmpl", {
+      commands = var.run_before
+    }
+  ) : ""
+
+  _mime_shared_folders = length(var.shared_folders) > 0 ? templatefile(
+    "${path.module}/templates/cloud-config-shared-folders.tmpl", {
+      shared_folders = var.shared_folders
+      fs_type        = local.fs_type
+    }
+  ) : ""
+
+  # NFS package: rocky_9 → nfs-utils, everything else → nfs-common
+  _nfs_package = (
+    coalesce(var.os_name, try(var.os_volume.os_name, "ubuntu_22")) == "rocky_9"
+    ? "nfs-utils"
+    : "nfs-common"
+  )
+
+  _mime_nfs_mounts = length(var.nfs_mounts) > 0 ? templatefile(
+    "${path.module}/templates/cloud-config-nfs-mounts.tmpl", {
+      nfs_mounts  = var.nfs_mounts
+      nfs_package = local._nfs_package
+    }
+  ) : ""
+
+  _mime_run_after = length(var.run_after) > 0 ? templatefile(
+    "${path.module}/templates/cloud-config-runcmd.tmpl", {
+      commands = var.run_after
+    }
+  ) : ""
+
+  _mime_parts = concat(
+    [
+      { filename = "hostname.cfg", content = trimspace(local._mime_hostname) },
+    ],
+    length(var.run_before) > 0 ? [
+      { filename = "run-before.cfg", content = trimspace(local._mime_run_before) },
+    ] : [],
+    [
+      { filename = "base.cfg", content = trimspace(var.user_data) },
+    ],
+    length(var.shared_folders) > 0 ? [
+      { filename = "shared-folders.cfg", content = trimspace(local._mime_shared_folders) },
+    ] : [],
+    length(var.nfs_mounts) > 0 ? [
+      { filename = "nfs-mounts.cfg", content = trimspace(local._mime_nfs_mounts) },
+    ] : [],
+    length(var.run_after) > 0 ? [
+      { filename = "run-after.cfg", content = trimspace(local._mime_run_after) },
+    ] : [],
+    var.user_data_after != null ? [
+      { filename = "after.cfg", content = trimspace(var.user_data_after) },
+    ] : [],
+  )
+
+  # Always use multipart MIME — hostname is always a separate fragment
+  user_data = join("\n", concat(
+    [
+      "Content-Type: multipart/mixed; boundary=\"MIMEBOUNDARY\"",
+      "MIME-Version: 1.0",
+      "",
+    ],
+    flatten([
+      for part in local._mime_parts : [
+        "--MIMEBOUNDARY",
+        "Content-Type: text/cloud-config; charset=\"us-ascii\"",
+        "Content-Disposition: attachment; filename=\"${part.filename}\"",
+        "",
+        part.content,
+        "",
+      ]
+    ]),
+    ["--MIMEBOUNDARY--"],
+  ))
 
   meta_data = templatefile("${path.module}/templates/meta-data.tmpl", {
     instance_id    = var.name
@@ -345,6 +448,18 @@ resource "libvirt_domain" "vm" {
   memory_unit = "MiB"
   vcpu        = local.current_vm_profile.vcpu
 
+  memory_backing = {
+    memory_access = {
+      mode = var.memory_backing.shared ? "shared" : "private"
+    }
+    memory_source = var.memory_backing.source != null ? {
+      type = var.memory_backing.source
+    } : null
+    memory_locked       = var.memory_backing.locked
+    memory_discard      = var.memory_backing.discard
+    memory_nosharepages = var.memory_backing.nosharepages
+  }
+
   os = {
     type = "hvm"
     boot = [{
@@ -424,6 +539,24 @@ resource "libvirt_domain" "vm" {
         }
       }
     ] : []
+
+    filesystems = [
+      for f in var.shared_folders : {
+        source = {
+          mount = {
+            dir = f.source
+          }
+        }
+        target = {
+          dir = f.target
+        }
+        read_only   = f.read_only
+        access_mode = local.fs_type == "virtiofs" ? "passthrough" : "mapped"
+        driver = {
+          type = local.fs_type == "virtiofs" ? "virtiofs" : "path"
+        }
+      }
+    ]
   }
 
   running     = local.running

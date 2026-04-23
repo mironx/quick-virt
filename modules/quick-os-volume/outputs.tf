@@ -9,6 +9,7 @@ output "volume" {
       network_template = local.selected_os.network_template
       interface_naming = local.selected_os.interface_naming
       interface_offset = local.selected_os.interface_offset
+      fs_type          = local.selected_os.fs_type
     }
   }
   description = "Base volume info to pass to quick-vm as os_volume"

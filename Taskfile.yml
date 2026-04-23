@@ -5,11 +5,90 @@ vars:
 
 tasks:
   # ---------------------------------------------------------------------------
+  # Self-management (for users who installed via install.sh)
+  # ---------------------------------------------------------------------------
+  self:version:
+    desc: Show the installed quick-virt version
+    cmd: |
+      if [ -f "{{.TASKFILE_DIR}}/.version" ]; then
+        cat "{{.TASKFILE_DIR}}/.version"
+      else
+        echo "unknown (running from a cloned repo, not an install)"
+      fi
+
+  self:where:
+    desc: Show where quick-virt is installed (prefix, binary, Taskfile, version)
+    cmd: |
+      echo "prefix   : {{.TASKFILE_DIR}}"
+      echo "taskfile : {{.TASKFILE_DIR}}/Taskfile.yml"
+      if command -v quick-virt >/dev/null 2>&1; then
+        echo "binary   : $(command -v quick-virt)"
+      else
+        echo "binary   : (quick-virt wrapper not on PATH)"
+      fi
+      if [ -f "{{.TASKFILE_DIR}}/.version" ]; then
+        echo "version  : $(cat "{{.TASKFILE_DIR}}/.version")"
+      else
+        echo "version  : unknown (running from a cloned repo, not an install)"
+      fi
+
+  self:update:
+    desc: Re-install the latest tag (or override with QV_VERSION=<tag>)
+    cmd: curl -fsSL https://raw.githubusercontent.com/mironx/quick-virt/main/install.sh | bash
+
+  self:uninstall:
+    desc: Remove the quick-virt installation (~/.local/share/quick-virt and ~/.local/bin/quick-virt)
+    cmd: |
+      rm -rf "$HOME/.local/share/quick-virt" "$HOME/.local/bin/quick-virt"
+      echo "[ok] quick-virt uninstalled"
+
+  # ---------------------------------------------------------------------------
   # Setup
   # ---------------------------------------------------------------------------
   setup:install-kvm:
     desc: Install KVM, libvirt, and related packages
     cmd: sudo {{.SCRIPTS_DIR}}/setup/install-kvm.sh
+
+  setup:enable-shared-folders:
+    desc: Allow libvirt-qemu to access current user's files (for shared folders / 9p)
+    cmd: 'sudo usermod -aG $(whoami) libvirt-qemu && echo "libvirt-qemu added to group $(whoami). Restart libvirtd: sudo systemctl restart libvirtd"'
+
+  setup:disable-shared-folders:
+    desc: Remove libvirt-qemu from current user's group
+    cmd: 'sudo gpasswd -d libvirt-qemu $(whoami) && echo "libvirt-qemu removed from group $(whoami). Restart libvirtd: sudo systemctl restart libvirtd"'
+
+  setup:enable-shared-folders-for:
+    desc: Allow libvirt-qemu to access a specific user's files (requires USER=<username>)
+    cmd: sudo usermod -aG {{.USER}} libvirt-qemu && echo "[ok] libvirt-qemu added to group {{.USER}}. Restart libvirtd{{":"}} sudo systemctl restart libvirtd"
+    requires:
+      vars: [USER]
+
+  setup:disable-shared-folders-for:
+    desc: Remove libvirt-qemu from a specific user's group (requires USER=<username>)
+    cmd: sudo gpasswd -d libvirt-qemu {{.USER}} && echo "[ok] libvirt-qemu removed from group {{.USER}}. Restart libvirtd{{":"}} sudo systemctl restart libvirtd"
+    requires:
+      vars: [USER]
+
+  setup:install-virtiofsd:
+    desc: Install virtiofsd daemon (required for virtiofs shared folders)
+    cmd: '{{.SCRIPTS_DIR}}/tools/check-shared-folders-drivers.sh install'
+
+  setup:check-shared-folders-drivers:
+    desc: Check virtiofs and 9p driver availability on the host
+    cmd: '{{.SCRIPTS_DIR}}/tools/check-shared-folders-drivers.sh'
+
+  setup:install-nfs-server:
+    desc: Install and enable the NFS server (nfs-kernel-server on Debian/Ubuntu, nfs-utils on Rocky)
+    cmd: sudo {{.SCRIPTS_DIR}}/setup/install-nfs-server.sh
+
+  setup:configure-nfs-export:
+    desc: 'Configure an NFS export (requires DIR, CIDR; optional OPTIONS, OWNER). Example{{":"}} task setup:configure-nfs-export DIR=/home/$USER/vm-shares CIDR=192.168.100.0/24'
+    cmd: sudo {{.SCRIPTS_DIR}}/setup/configure-nfs-export.sh "{{.DIR}}" "{{.CIDR}}" "{{.OPTIONS}}" "{{.OWNER}}"
+    vars:
+      OPTIONS: '{{.OPTIONS | default "rw,sync,no_subtree_check,no_root_squash"}}'
+      OWNER: '{{.OWNER | default ""}}'
+    requires:
+      vars: [DIR, CIDR]
 
   # ---------------------------------------------------------------------------
   # Linux Bridge

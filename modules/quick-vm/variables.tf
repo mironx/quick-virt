@@ -36,6 +36,24 @@ variable "user_data" {
     description = "User data for cloud-init"
 }
 
+variable "user_data_after" {
+    type        = string
+    description = "Additional cloud-init user data that runs after shared folders mount"
+    default     = null
+}
+
+variable "run_before" {
+    type        = list(string)
+    description = "List of commands to run before user_data (right after hostname setup)"
+    default     = []
+}
+
+variable "run_after" {
+    type        = list(string)
+    description = "List of commands to run after shared folders mount, before user_data_after"
+    default     = []
+}
+
 variable "main_storage" {
   description = "Configuration options for the VM's main disk"
   type = object({
@@ -54,6 +72,18 @@ variable "vm_profile" {
   })
 }
 
+variable "memory_backing" {
+  description = "Memory backing configuration for the VM"
+  type = object({
+    shared       = optional(bool, true)
+    source       = optional(string)
+    locked       = optional(bool, false)
+    discard      = optional(bool, false)
+    nosharepages = optional(bool, false)
+  })
+  default = {}
+}
+
 variable "os_volume" {
   description = "Shared base volume from quick-os-volume module. Takes priority over os_name/os_profile."
   type = object({
@@ -66,6 +96,7 @@ variable "os_volume" {
       network_template = string
       interface_naming = string
       interface_offset = number
+      fs_type          = string
     })
   })
   default = null
@@ -88,6 +119,7 @@ variable "os_profile" {
     network_template = optional(string, "netplan")
     interface_naming = optional(string, "enp0s")
     interface_offset = optional(number, 3)
+    fs_type          = optional(string, "virtiofs")
   })
   default = null
 }
@@ -99,6 +131,16 @@ variable "os_image_mode" {
   validation {
     condition     = contains(["local", "url"], var.os_image_mode)
     error_message = "os_image_mode must be 'local' or 'url'"
+  }
+}
+
+variable "fs_type" {
+  description = "Filesystem type for shared folders: 'virtiofs' or '9p'. Overrides os_profile.fs_type if set."
+  type        = string
+  default     = "virtiofs"
+  validation {
+    condition     = var.fs_type == null || contains(["virtiofs", "9p"], var.fs_type)
+    error_message = "fs_type must be 'virtiofs' or '9p'"
   }
 }
 
@@ -143,6 +185,27 @@ variable "networks" {
     }))
     ip      = optional(string)
     enabled = optional(bool, true)
+  }))
+  default = []
+}
+
+variable "shared_folders" {
+  description = "List of host directories to mount in the VM via 9p/virtio"
+  type = list(object({
+    source    = string
+    target    = string
+    read_only = optional(bool, false)
+  }))
+  default = []
+}
+
+variable "nfs_mounts" {
+  description = "List of NFS shares to mount in the VM. Each entry becomes /mnt/<target>."
+  type = list(object({
+    host    = string
+    source  = string
+    target  = string
+    options = optional(string, "defaults")
   }))
   default = []
 }

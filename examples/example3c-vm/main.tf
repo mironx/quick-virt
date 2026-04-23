@@ -24,38 +24,43 @@ locals {
     user_name     = "ubuntu"
     user_password = "ubuntu123"
   })
+
 }
 
 module "ubuntu_22_test" {
   source       = "./modules/vm-ubuntu-22-test"
-  prefix       = "${local.prefix}-ubuntu22"
+  prefix       = "${local.prefix}-u22"
   kvm_networks = local.kvm_networks
   vm_profile   = local.vm_profile
-  user_data    = local.user_data
+  user_data   = local.user_data
+  vmdata_path = "${abspath(path.module)}/vmdata"
 }
 
 module "ubuntu_24_test" {
   source       = "./modules/vm-ubuntu-24-test"
-  prefix       = "${local.prefix}-ubuntu24"
+  prefix       = "${local.prefix}-u24"
   kvm_networks = local.kvm_networks
   vm_profile   = local.vm_profile
-  user_data    = local.user_data
+  user_data   = local.user_data
+  vmdata_path = "${abspath(path.module)}/vmdata"
 }
 
 module "rocky_9_test" {
   source       = "./modules/vm-rocky-9-test"
-  prefix       = "${local.prefix}-rocky9"
+  prefix       = "${local.prefix}-r9"
   kvm_networks = local.kvm_networks
   vm_profile   = local.vm_profile
-  user_data    = local.user_data
+  user_data   = local.user_data
+  vmdata_path = "${abspath(path.module)}/vmdata"
 }
 
 module "debian_12_test" {
   source       = "./modules/vm-debian-12-test"
-  prefix       = "${local.prefix}-debian12"
+  prefix       = "${local.prefix}-d12"
   kvm_networks = local.kvm_networks
   vm_profile   = local.vm_profile
-  user_data    = local.user_data
+  user_data   = local.user_data
+  vmdata_path = "${abspath(path.module)}/vmdata"
 }
 
 output "ubuntu_22" {

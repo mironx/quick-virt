@@ -6,8 +6,9 @@ output "vms_info" {
       id         = vm.vm_id
       ips        = vm.vm_ips
       networks   = vm.vm_networks
-      os_profile = vm.vm_os_profile
-      vm_profile = vm.vm_profile
+      os_profile     = vm.vm_os_profile
+      vm_profile     = vm.vm_profile
+      shared_folders = vm.vm_shared_folders
     }
   }
 }

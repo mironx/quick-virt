@@ -17,7 +17,9 @@ output "vm_networks" {
   value = [
     for idx, n in local.resolved_networks : {
       index            = idx
-      interface        = "${local.selected_os.interface_naming}${idx + local.selected_os.interface_offset}"
+      interface        = "${local.selected_os.interface_naming}${idx + local.selected_os.interface_offset + (
+        local.selected_os.interface_naming == "eth" ? 0 : length(var.shared_folders)
+      )}"
       ip               = n.ip
       profile_name     = n.profile_name
       kvm_network_name = try(n.profile.kvm_network_name, n.profile_name)
@@ -30,10 +32,11 @@ output "vm_os_profile" {
   value = {
     os_name          = coalesce(var.os_name, "ubuntu_22")
     image            = local.selected_os.image
-    os_image_mode       = var.os_image_mode
-    os_disk_mode        = var.os_disk_mode
+    os_image_mode    = var.os_image_mode
+    os_disk_mode     = var.os_disk_mode
     network_template = local.selected_os.network_template
     interface_naming = local.selected_os.interface_naming
+    fs_type          = local.fs_type
   }
   description = "Resolved OS profile for the VM"
 }
@@ -44,4 +47,17 @@ output "vm_profile" {
     memory = local.current_vm_profile.memory
   }
   description = "VM compute profile"
+}
+
+output "vm_shared_folders" {
+  value = [
+    for f in var.shared_folders : {
+      source    = f.source
+      target    = f.target
+      read_only = f.read_only
+      mount     = "/mnt/${f.target}"
+      fs_type   = local.fs_type
+    }
+  ]
+  description = "Shared folders configuration with resolved fs_type"
 }

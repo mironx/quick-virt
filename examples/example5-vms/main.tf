@@ -49,6 +49,9 @@ module "vms_A" {
         password = "ubuntu123"
       }
       cloud_init_user_data_path = "./templates/user-data.tmpl"
+      shared_folders = [
+        { source = "${abspath(path.module)}/vmdata", target = "vmdata" }
+      ]
       nodes = [
         {
           name = "v1"
@@ -87,6 +90,9 @@ module "vms_B" {
         password = "ubuntu123"
       }
       cloud_init_user_data_path = "./templates/user-data.tmpl"
+      shared_folders = [
+        { source = "${abspath(path.module)}/vmdata", target = "vmdata" }
+      ]
       nodes = [
         {
           name = "v1"
