@@ -66,7 +66,7 @@ locals {
       interface_naming = var.os_profile.interface_naming
       interface_offset = try(var.os_profile.interface_offset, 3)
       fs_type          = try(var.os_profile.fs_type, "virtiofs")
-    } : {
+      } : {
       image            = var.os_image_mode == "local" ? local._builtin_os.image_local : local._builtin_os.image_url
       network_template = local._builtin_os.network_template
       interface_naming = local._builtin_os.interface_naming
@@ -138,7 +138,7 @@ locals {
         bridge           = try(n.profile.bridge, null)
         error            = try(n.profile.error, "")
         mode             = try(n.profile.mode, null)
-      } : (
+        } : (
         contains(keys(local.networks_needing_reader), tostring(idx))
         ? {
           kvm_network_name = module.network_profile_reader[tostring(idx)].profile.kvm_network_name
@@ -315,7 +315,7 @@ locals {
 locals {
   main_storage = var.main_storage != null ? {
     size = coalesce(var.main_storage.size, 20)
-  } : {
+    } : {
     size = 20
   }
   main_storage_size = local.main_storage.size * 1024 * 1024 * 1024
@@ -344,8 +344,8 @@ locals {
     var.os_disk_mode == "clone"
     ? null
     : var.os_volume != null
-      ? var.os_volume.path
-      : libvirt_volume.vm-disk-reference[0].path
+    ? var.os_volume.path
+    : libvirt_volume.vm-disk-reference[0].path
   )
 }
 
@@ -429,7 +429,7 @@ locals {
         bridge = {
           bridge = n.profile.bridge
         }
-      } : {
+        } : {
         network = {
           network = try(n.profile.kvm_network_name, n.profile_name)
         }
@@ -458,11 +458,11 @@ locals {
 
   cpu_limit_enabled = local._cpu_limit_raw != null && (local._has_cpu_percent || local._has_cpu_raw || local._has_cpu_shares)
 
-  _cpu_period = coalesce(try(local._cpu_limit_raw.period_us, null), 100000)
+  _cpu_period             = coalesce(try(local._cpu_limit_raw.period_us, null), 100000)
   _cpu_quota_from_percent = local._has_cpu_percent ? floor(var.vm_profile.vcpu * local._cpu_period * local._cpu_limit_raw.percent / 100) : null
 
   _cpu_user_set_period_us = try(local._cpu_limit_raw.period_us, null) != null
-  _cpu_user_set_quota_us  = try(local._cpu_limit_raw.quota_us,  null) != null
+  _cpu_user_set_quota_us  = try(local._cpu_limit_raw.quota_us, null) != null
 
   cpu_limit = local.cpu_limit_enabled ? {
     percent   = try(local._cpu_limit_raw.percent, null)
@@ -489,16 +489,16 @@ locals {
   _io_raw = try(var.vm_profile.io, null)
   io_limits = local._io_raw != null ? {
     for dev, t in local._io_raw : dev => {
-      read_bytes_sec             = try(t.read_bytes_sec,  null) == null ? null : t.read_bytes_sec  * local._byte_units[coalesce(try(t.read_bytes_sec_unit,  null), try(t.bytes_unit, null), "B")]
+      read_bytes_sec             = try(t.read_bytes_sec, null) == null ? null : t.read_bytes_sec * local._byte_units[coalesce(try(t.read_bytes_sec_unit, null), try(t.bytes_unit, null), "B")]
       write_bytes_sec            = try(t.write_bytes_sec, null) == null ? null : t.write_bytes_sec * local._byte_units[coalesce(try(t.write_bytes_sec_unit, null), try(t.bytes_unit, null), "B")]
-      read_iops_sec              = try(t.read_iops_sec,   null)
-      write_iops_sec             = try(t.write_iops_sec,  null)
-      read_bytes_sec_max         = try(t.read_bytes_sec_max,  null) == null ? null : t.read_bytes_sec_max  * local._byte_units[coalesce(try(t.read_bytes_sec_max_unit,  null), try(t.bytes_unit, null), "B")]
-      read_bytes_sec_max_length  = try(t.read_bytes_sec_max_length,  null)
+      read_iops_sec              = try(t.read_iops_sec, null)
+      write_iops_sec             = try(t.write_iops_sec, null)
+      read_bytes_sec_max         = try(t.read_bytes_sec_max, null) == null ? null : t.read_bytes_sec_max * local._byte_units[coalesce(try(t.read_bytes_sec_max_unit, null), try(t.bytes_unit, null), "B")]
+      read_bytes_sec_max_length  = try(t.read_bytes_sec_max_length, null)
       write_bytes_sec_max        = try(t.write_bytes_sec_max, null) == null ? null : t.write_bytes_sec_max * local._byte_units[coalesce(try(t.write_bytes_sec_max_unit, null), try(t.bytes_unit, null), "B")]
       write_bytes_sec_max_length = try(t.write_bytes_sec_max_length, null)
-      read_iops_sec_max          = try(t.read_iops_sec_max,  null)
-      read_iops_sec_max_length   = try(t.read_iops_sec_max_length,  null)
+      read_iops_sec_max          = try(t.read_iops_sec_max, null)
+      read_iops_sec_max_length   = try(t.read_iops_sec_max_length, null)
       write_iops_sec_max         = try(t.write_iops_sec_max, null)
       write_iops_sec_max_length  = try(t.write_iops_sec_max_length, null)
     }
@@ -517,15 +517,15 @@ locals {
     for iface, cfg in local._net_raw : iface => {
       inbound = try(cfg.inbound, null) == null ? null : {
         average = try(cfg.inbound.average, null) == null ? null : cfg.inbound.average * local._net_units[coalesce(try(cfg.inbound.average_unit, null), try(cfg.rate_unit, null), "KB")]
-        peak    = try(cfg.inbound.peak,    null) == null ? null : cfg.inbound.peak    * local._net_units[coalesce(try(cfg.inbound.peak_unit,    null), try(cfg.rate_unit, null), "KB")]
-        burst   = try(cfg.inbound.burst,   null) == null ? null : cfg.inbound.burst   * local._net_units[coalesce(try(cfg.inbound.burst_unit,   null), try(cfg.rate_unit, null), "KB")]
-        floor   = try(cfg.inbound.floor,   null) == null ? null : cfg.inbound.floor   * local._net_units[coalesce(try(cfg.inbound.floor_unit,   null), try(cfg.rate_unit, null), "KB")]
+        peak    = try(cfg.inbound.peak, null) == null ? null : cfg.inbound.peak * local._net_units[coalesce(try(cfg.inbound.peak_unit, null), try(cfg.rate_unit, null), "KB")]
+        burst   = try(cfg.inbound.burst, null) == null ? null : cfg.inbound.burst * local._net_units[coalesce(try(cfg.inbound.burst_unit, null), try(cfg.rate_unit, null), "KB")]
+        floor   = try(cfg.inbound.floor, null) == null ? null : cfg.inbound.floor * local._net_units[coalesce(try(cfg.inbound.floor_unit, null), try(cfg.rate_unit, null), "KB")]
       }
       outbound = try(cfg.outbound, null) == null ? null : {
         average = try(cfg.outbound.average, null) == null ? null : cfg.outbound.average * local._net_units[coalesce(try(cfg.outbound.average_unit, null), try(cfg.rate_unit, null), "KB")]
-        peak    = try(cfg.outbound.peak,    null) == null ? null : cfg.outbound.peak    * local._net_units[coalesce(try(cfg.outbound.peak_unit,    null), try(cfg.rate_unit, null), "KB")]
-        burst   = try(cfg.outbound.burst,   null) == null ? null : cfg.outbound.burst   * local._net_units[coalesce(try(cfg.outbound.burst_unit,   null), try(cfg.rate_unit, null), "KB")]
-        floor   = try(cfg.outbound.floor,   null) == null ? null : cfg.outbound.floor   * local._net_units[coalesce(try(cfg.outbound.floor_unit,   null), try(cfg.rate_unit, null), "KB")]
+        peak    = try(cfg.outbound.peak, null) == null ? null : cfg.outbound.peak * local._net_units[coalesce(try(cfg.outbound.peak_unit, null), try(cfg.rate_unit, null), "KB")]
+        burst   = try(cfg.outbound.burst, null) == null ? null : cfg.outbound.burst * local._net_units[coalesce(try(cfg.outbound.burst_unit, null), try(cfg.rate_unit, null), "KB")]
+        floor   = try(cfg.outbound.floor, null) == null ? null : cfg.outbound.floor * local._net_units[coalesce(try(cfg.outbound.floor_unit, null), try(cfg.rate_unit, null), "KB")]
       }
     }
   } : {}
@@ -761,6 +761,57 @@ resource "local_file" "limits_sh_clear" {
 resource "local_file" "limits_gitignore" {
   count           = (local.limits_ini != "" || local.limits_sh != "" || local.limits_sh_clear != "") ? 1 : 0
   filename        = "${path.root}/.qv-limits/.gitignore"
+  content         = "*\n!.gitignore\n"
+  file_permission = "0644"
+}
+
+//-------------------------------------------------------------------------------
+// SSH helper files — per-VM ssh-config fragment + hosts fragment.
+// Use directly:  ssh -F .qv-ssh/qv-ssh.config.<vm>.conf <alias>
+// Or include manually in ~/.ssh/config / append to /etc/hosts as needed.
+//-------------------------------------------------------------------------------
+
+locals {
+  ssh_files_enabled = try(var.vm_profile.enable_ssh_files, true)
+  ssh_identity_file = coalesce(var.ssh_identity_file, "~/.ssh/id_rsa")
+
+  _ssh_entries_raw = [
+    for idx, net in var.networks :
+    net.ip != null && net.ip != "" && try(net.enabled, true) ? {
+      host = "${var.name}-net${idx}-${net.profile_name}"
+      ip   = net.ip
+    } : null
+  ]
+  ssh_entries = [for e in local._ssh_entries_raw : e if e != null]
+
+  ssh_has_entries = local.ssh_files_enabled && var.ssh_user != null && length(local.ssh_entries) > 0
+}
+
+resource "local_file" "ssh_config" {
+  count           = local.ssh_has_entries ? 1 : 0
+  filename        = "${path.root}/.qv-ssh/qv-ssh.config.${var.name}.conf"
+  file_permission = "0644"
+  content = templatefile("${path.module}/templates/ssh-config.conf.tmpl", {
+    vm_name       = var.name
+    entries       = local.ssh_entries
+    ssh_user      = var.ssh_user
+    identity_file = local.ssh_identity_file
+  })
+}
+
+resource "local_file" "ssh_hosts" {
+  count           = local.ssh_has_entries ? 1 : 0
+  filename        = "${path.root}/.qv-ssh/qv-ssh.hosts.${var.name}.hosts"
+  file_permission = "0644"
+  content = templatefile("${path.module}/templates/ssh-hosts.txt.tmpl", {
+    vm_name = var.name
+    entries = local.ssh_entries
+  })
+}
+
+resource "local_file" "ssh_gitignore" {
+  count           = local.ssh_has_entries ? 1 : 0
+  filename        = "${path.root}/.qv-ssh/.gitignore"
   content         = "*\n!.gitignore\n"
   file_permission = "0644"
 }

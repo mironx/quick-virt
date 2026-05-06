@@ -16,8 +16,8 @@ output "vm_ips" {
 output "vm_networks" {
   value = [
     for idx, n in local.resolved_networks : {
-      index            = idx
-      interface        = "${local.selected_os.interface_naming}${idx + local.selected_os.interface_offset + (
+      index = idx
+      interface = "${local.selected_os.interface_naming}${idx + local.selected_os.interface_offset + (
         local.selected_os.interface_naming == "eth" ? 0 : length(var.shared_folders)
       )}"
       ip               = n.ip

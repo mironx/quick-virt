@@ -26,8 +26,7 @@ The `quick-vms` module creates a **set of VMs** based on a machines configuratio
 
 - Provisioning of multiple VMs with shared or standalone OS volumes
 - Network profile reading and filtering via `kvm-networks` map
-- SSH configuration generation (`qv-ssh-config-*.qv-info`)
-- Hosts file generation (`qv-hosts-*.qv-info`)
+- SSH helper files in `.qv-ssh/` (per-VM fragments + install/uninstall scripts, plus set-level orchestrators) — see [`doc/USAGE.md`](./USAGE.md)
 
 Ensure your cloud-init configuration includes your **public SSH key** to enable passwordless access.
 
@@ -37,13 +36,11 @@ Each module is located in the [`modules`](../modules) directory:
 
 | Module | Description |
 |--------|-------------|
-| [`quick-vm`](../modules/quick-vm) | Provision a single VM with dynamic networks, OS profiles, and disk modes |
-| [`quick-vms`](../modules/quick-vms) | Provision multiple VMs with shared network config and SSH/hosts generation |
+| [`quick-vm`](../modules/quick-vm) | Provision a single VM with dynamic networks, OS profiles, disk modes, and per-VM SSH helper files |
+| [`quick-vms`](../modules/quick-vms) | Provision multiple VMs with shared network config and set-level SSH helper orchestrators |
 | [`quick-os-volume`](../modules/quick-os-volume) | Create shared base OS volume for thin provisioning across VMs |
 | [`quick-networks`](../modules/quick-networks) | Create KVM virtual networks (NAT and bridge) |
 | [`quick-kvm-network-reader`](../modules/quick-kvm-network-reader) | Read and expose KVM network info via shell script |
-| [`quick-ssh-config`](../modules/quick-ssh-config) | Generate SSH config with usage instructions |
-| [`quick-hosts`](../modules/quick-hosts) | Generate `hosts` entries for VMs |
 
 ## Examples
 

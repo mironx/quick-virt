@@ -1,57 +1,57 @@
 variable "name" {
-    type = string
-    description = "Name of the VM"
-    validation {
-        condition     = length(var.name) > 0
-        error_message = "VM name must be defined and not empty"
-    }
+  type        = string
+  description = "Name of the VM"
+  validation {
+    condition     = length(var.name) > 0
+    error_message = "VM name must be defined and not empty"
+  }
 }
 
 variable "running" {
-  type = bool
+  type        = bool
   description = "Use false to turn off the instance. If not specified, true is assumed and the instance, if stopped, will be started at next apply."
-  default = true
+  default     = true
 }
 
 variable "autostart" {
-  type = bool
+  type        = bool
   description = "Set to true to start the domain on host boot up. If not specified false is assumed."
-  default = false
+  default     = false
 }
 
 variable "description" {
-  type = string
+  type        = string
   description = "The description for domain. Changing this forces a new resource to be created. This data is not used by libvirt in any way, it can contain any information the user wants."
-  default = null
+  default     = null
 }
 
 variable "storage_pool" {
-  type = string
+  type        = string
   description = "The storage pool to use for the VM disk"
-  default = "default"
+  default     = "default"
 }
 
 variable "user_data" {
-    type = string
-    description = "User data for cloud-init"
+  type        = string
+  description = "User data for cloud-init"
 }
 
 variable "user_data_after" {
-    type        = string
-    description = "Additional cloud-init user data that runs after shared folders mount"
-    default     = null
+  type        = string
+  description = "Additional cloud-init user data that runs after shared folders mount"
+  default     = null
 }
 
 variable "run_before" {
-    type        = list(string)
-    description = "List of commands to run before user_data (right after hostname setup)"
-    default     = []
+  type        = list(string)
+  description = "List of commands to run before user_data (right after hostname setup)"
+  default     = []
 }
 
 variable "run_after" {
-    type        = list(string)
-    description = "List of commands to run after shared folders mount, before user_data_after"
-    default     = []
+  type        = list(string)
+  description = "List of commands to run after shared folders mount, before user_data_after"
+  default     = []
 }
 
 variable "main_storage" {
@@ -85,25 +85,25 @@ variable "vm_profile" {
     # Valid units: "B" (=1), "KB" (=1024), "MB" (=1048576), "GB" (=1073741824).
     # *_max_length is always seconds — no unit.
     io = optional(map(object({
-      bytes_unit                      = optional(string)
+      bytes_unit = optional(string)
 
-      read_bytes_sec                  = optional(number)
-      read_bytes_sec_unit             = optional(string)
-      write_bytes_sec                 = optional(number)
-      write_bytes_sec_unit            = optional(string)
-      read_iops_sec                   = optional(number)
-      write_iops_sec                  = optional(number)
+      read_bytes_sec       = optional(number)
+      read_bytes_sec_unit  = optional(string)
+      write_bytes_sec      = optional(number)
+      write_bytes_sec_unit = optional(string)
+      read_iops_sec        = optional(number)
+      write_iops_sec       = optional(number)
 
-      read_bytes_sec_max              = optional(number)
-      read_bytes_sec_max_unit         = optional(string)
-      read_bytes_sec_max_length       = optional(number)
-      write_bytes_sec_max             = optional(number)
-      write_bytes_sec_max_unit        = optional(string)
-      write_bytes_sec_max_length      = optional(number)
-      read_iops_sec_max               = optional(number)
-      read_iops_sec_max_length        = optional(number)
-      write_iops_sec_max              = optional(number)
-      write_iops_sec_max_length       = optional(number)
+      read_bytes_sec_max         = optional(number)
+      read_bytes_sec_max_unit    = optional(string)
+      read_bytes_sec_max_length  = optional(number)
+      write_bytes_sec_max        = optional(number)
+      write_bytes_sec_max_unit   = optional(string)
+      write_bytes_sec_max_length = optional(number)
+      read_iops_sec_max          = optional(number)
+      read_iops_sec_max_length   = optional(number)
+      write_iops_sec_max         = optional(number)
+      write_iops_sec_max_length  = optional(number)
     })))
 
     # Per-interface network bandwidth throttle. Key = interface index as string
@@ -140,7 +140,23 @@ variable "vm_profile" {
     # enable_live  : write sidecar .ini + .sh into path.root/.qv-limits/ (for live-apply via virsh).
     enable_config = optional(bool, true)
     enable_live   = optional(bool, false)
+
+    # enable_ssh_files: emit ssh-config / hosts fragments + install/uninstall
+    # scripts into path.root/.qv-ssh/. Set to false to skip SSH helper files.
+    enable_ssh_files = optional(bool, true)
   })
+}
+
+variable "ssh_user" {
+  type        = string
+  description = "Username used in the generated SSH config fragment (User directive). When null, SSH helper files are not generated."
+  default     = null
+}
+
+variable "ssh_identity_file" {
+  type        = string
+  description = "Path to SSH private key used in the generated SSH config fragment (IdentityFile directive). Defaults to ~/.ssh/id_rsa."
+  default     = null
 }
 
 variable "memory_backing" {
@@ -158,9 +174,9 @@ variable "memory_backing" {
 variable "os_volume" {
   description = "Shared base volume from quick-os-volume module. Takes priority over os_name/os_profile."
   type = object({
-    path = string
-    name = string
-    pool = string
+    path    = string
+    name    = string
+    pool    = string
     os_name = string
     os_profile = object({
       image            = string

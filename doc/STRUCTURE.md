@@ -10,9 +10,7 @@ quick-virt/
 │   ├── quick-vms/                # Multi-VM provisioning
 │   ├── quick-networks/           # KVM network creation
 │   ├── quick-kvm-network-reader/ # Read KVM network info
-│   ├── quick-kvm-storage-pool-reader/ # Read KVM storage pool info
-│   ├── quick-ssh-config/         # SSH config generation
-│   └── quick-hosts/              # Hosts file generation
+│   └── quick-kvm-storage-pool-reader/ # Read KVM storage pool info
 ├── examples/                     # Usage examples
 │   ├── example1-network/         # Create KVM networks
 │   ├── example2-kvm-network-reader/ # Read and display network parameters
@@ -43,8 +41,7 @@ Provisions a single KVM virtual machine with flexible network configuration.
 Provisions multiple VMs from a declarative configuration map. Wraps `quick-vm` and adds:
 
 - Shared network profile reader (one reader per network, shared across all VMs)
-- SSH config generation via `quick-ssh-config`
-- Hosts file generation via `quick-hosts`
+- Set-level SSH helper orchestrators (install/uninstall config & hosts for every VM in a set) — per-VM fragments and scripts are emitted by `quick-vm` into `.qv-ssh/`
 - Cloud-init user-data from template file or inline template
 
 ### quick-networks
@@ -56,14 +53,6 @@ Creates KVM virtual networks (NAT or bridge mode) from a configuration map.
 Reads KVM network configuration using `virsh net-dumpxml` and exposes it as a Terraform-compatible profile. Outputs include network address, mask, gateway, mode, and an `error` field for graceful error handling (e.g., bridge interface without IPv4).
 
 Includes a test script: `scripts/kvm-net-info-test.sh`
-
-### quick-ssh-config
-
-Generates SSH config file entries for a set of VMs (local and bridge IPs).
-
-### quick-hosts
-
-Generates `/etc/hosts`-style entries for a set of VMs.
 
 ### quick-kvm-storage-pool-reader
 

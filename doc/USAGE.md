@@ -12,7 +12,7 @@ End-to-end reference for the `quick-virt` Terraform modules with working example
   - [`quick-vm` — single VM](#quick-vm--single-vm)
   - [`quick-vms` — multiple VMs (sets)](#quick-vms--multiple-vms-sets)
   - [`quick-kvm-network-reader` — read existing network](#quick-kvm-network-reader--read-existing-network)
-  - [`quick-ssh-config` / `quick-hosts` — helpers](#quick-ssh-config--quick-hosts--helpers)
+  - [SSH helper files (`.qv-ssh/`)](#ssh-helper-files-qv-ssh)
 - [Feature deep dives](#feature-deep-dives)
   - [OS profiles (built-in vs custom)](#os-profiles-built-in-vs-custom)
   - [Shared base volume (`os_volume`)](#shared-base-volume-os_volume)
@@ -269,9 +269,31 @@ module "net_info" {
 }
 ```
 
-### `quick-ssh-config` / `quick-hosts` — helpers
+### SSH helper files (`.qv-ssh/`)
 
-Generate a ready-to-use SSH config and `hosts` snippet for the VMs just created by `quick-vms`. Most of the time these are wired automatically behind the scenes — you only pass the `vms_info` output. See `examples/example4-vms` for a full wiring.
+Every VM that has at least one network IP assigned gets two helper files written into `path.root/.qv-ssh/` — both emitted per-VM by `quick-vm` (keyed by the full VM name, which is `<set>-<node>` when created via `quick-vms`):
+
+| File | Purpose |
+|------|---------|
+| `qv-ssh.config.<vm>.conf` | SSH config fragment: one `Host` block per network interface (alias: `<vm>-net<idx>-<profile>`) |
+| `qv-ssh.hosts.<vm>.hosts` | `/etc/hosts`-style lines for the same aliases |
+
+**Flags / inputs:**
+
+- `vm_profile.enable_ssh_files` (default `true`) — set to `false` on a `quick-vms` set (or `quick-vm` instance) to skip helper file generation.
+- `ssh_user` (on `quick-vm` — forwarded automatically by `quick-vms` from `machines[*].user.name`) — fills the `User` line in the config fragment. When `null`, no helper files are generated.
+- `ssh_identity_file` (on `quick-vm`) — `IdentityFile` directive. Defaults to `~/.ssh/id_rsa`.
+
+**Typical use:**
+
+```bash
+# direct: pass the fragment as an SSH config file
+ssh -F .qv-ssh/qv-ssh.config.<vm>.conf <vm>-net0-<profile>
+
+# or wire into ~/.ssh/config manually:
+#   Include /abs/path/to/.qv-ssh/qv-ssh.config.<vm>.conf
+# and append .qv-ssh/qv-ssh.hosts.<vm>.txt to /etc/hosts as needed.
+```
 
 ---
 

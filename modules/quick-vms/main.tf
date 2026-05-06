@@ -63,12 +63,12 @@ locals {
       set_val.cloud_init_user_data_template != null
       ? set_val.cloud_init_user_data_template
       : (
-      set_val.cloud_init_user_data_path != null
-      ? templatefile("${path.root}/${set_val.cloud_init_user_data_path}", {
-        user_name     = set_val.user.name,
-        user_password = set_val.user.password
-      })
-      : file("ERROR: Both cloud_init_user_data_template and cloud_init_user_data_path are null for set '${set_key}'")
+        set_val.cloud_init_user_data_path != null
+        ? templatefile("${path.root}/${set_val.cloud_init_user_data_path}", {
+          user_name     = set_val.user.name,
+          user_password = set_val.user.password
+        })
+        : file("ERROR: Both cloud_init_user_data_template and cloud_init_user_data_path are null for set '${set_key}'")
       )
     )
   }
@@ -145,46 +145,48 @@ module "vms" {
     {
       for node in set_val.nodes :
       "${set_key}-${node.name}" => {
-        set_key      = set_key
-        set_name     = set_val.set_name
-        vm_profile   = set_val.vm_profile
-        main_storage = set_val.main_storage
+        set_key         = set_key
+        set_name        = set_val.set_name
+        vm_profile      = set_val.vm_profile
+        main_storage    = set_val.main_storage
         user_data       = local.user_data_map[set_key]
         user_data_after = local.user_data_after_map[set_key]
         run_before      = set_val.run_before
         run_after       = set_val.run_after
         os_volume       = set_val.os_volume
-        os_name      = set_val.os_name
-        os_profile   = set_val.os_profile
+        os_name         = set_val.os_name
+        os_profile      = set_val.os_profile
         os_image_mode   = set_val.os_image_mode
         os_disk_mode    = set_val.os_disk_mode
         fs_type         = set_val.fs_type
         memory_backing  = set_val.memory_backing
         shared_folders  = set_val.shared_folders
         nfs_mounts      = set_val.nfs_mounts
-        node         = node
+        ssh_user        = set_val.user.name
+        node            = node
       }
     }
   ]...)
 
-  source       = "../quick-vm"
-  name         = "${each.value.set_name}-${each.value.node.name}"
-  description  = each.value.node.description
+  source          = "../quick-vm"
+  name            = "${each.value.set_name}-${each.value.node.name}"
+  description     = each.value.node.description
   user_data       = each.value.user_data
   user_data_after = each.value.user_data_after
   run_before      = each.value.run_before
   run_after       = each.value.run_after
   vm_profile      = each.value.vm_profile
-  main_storage = each.value.main_storage
-  os_volume    = each.value.os_volume
-  os_name      = each.value.os_name
-  os_profile   = each.value.os_profile
+  main_storage    = each.value.main_storage
+  os_volume       = each.value.os_volume
+  os_name         = each.value.os_name
+  os_profile      = each.value.os_profile
   os_image_mode   = each.value.os_image_mode
   os_disk_mode    = each.value.os_disk_mode
   fs_type         = each.value.fs_type
   memory_backing  = each.value.memory_backing
   shared_folders  = each.value.shared_folders
   nfs_mounts      = each.value.nfs_mounts
+  ssh_user        = each.value.ssh_user
 
   networks = [
     for net in each.value.node.networks : {
@@ -239,23 +241,4 @@ resource "local_file" "set_limits_clear" {
       vm_names = local._set_vm_names[each.key]
     }
   )
-}
-
-//-------------------------------------------------------------------------------
-// SSH config & hosts generators
-//-------------------------------------------------------------------------------
-
-module "quick-ssh-config-generator" {
-  for_each = local.machines
-  source   = "../quick-ssh-config"
-  set_name = each.value.set_name
-  user     = each.value.user.name
-  nodes    = each.value.nodes
-}
-
-module "quick-hosts-generator" {
-  for_each = local.machines
-  source   = "../quick-hosts"
-  set_name = each.value.set_name
-  nodes    = each.value.nodes
 }

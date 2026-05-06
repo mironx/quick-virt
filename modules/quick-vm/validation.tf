@@ -19,7 +19,7 @@ resource "null_resource" "validate_vm" {
     }
 
     precondition {
-      condition = var.os_volume != null || var.os_profile != null || var.os_image_mode == "url" || fileexists(local.selected_os.image)
+      condition     = var.os_volume != null || var.os_profile != null || var.os_image_mode == "url" || fileexists(local.selected_os.image)
       error_message = <<-EOT
         Image file not found: ${local.selected_os.image}
         [vm_name:${var.name}, os_name:${coalesce(var.os_name, "ubuntu_22")}, image_mode:${var.os_image_mode}]
@@ -32,7 +32,7 @@ resource "null_resource" "validate_vm" {
       EOT
     }
     precondition {
-      condition = !(var.os_disk_mode == "clone" && var.os_volume != null)
+      condition     = !(var.os_disk_mode == "clone" && var.os_volume != null)
       error_message = <<-EOT
         disk_mode "clone" with os_volume is not supported — libvirt creates volumes as root:root
         with 600 permissions, making file-based cloning from os_volume impossible.
@@ -89,7 +89,7 @@ resource "null_resource" "validate_shared_folders" {
     }
 
     precondition {
-      condition = fileexists("${each.value.source}/.gitkeep")
+      condition     = fileexists("${each.value.source}/.gitkeep")
       error_message = <<-EOT
         Shared folder directory not found: ${each.value.source}
         [vm_name:${var.name}, target:${each.value.target}]
@@ -100,7 +100,7 @@ resource "null_resource" "validate_shared_folders" {
     }
 
     precondition {
-      condition = !(local.fs_type == "9p" && contains(["rocky_9"], coalesce(var.os_name, try(var.os_volume.os_name, ""))))
+      condition     = !(local.fs_type == "9p" && contains(["rocky_9"], coalesce(var.os_name, try(var.os_volume.os_name, ""))))
       error_message = <<-EOT
         fs_type "9p" is not supported on Rocky Linux 9 — kernel does not include 9p module.
         [vm_name:${var.name}]
@@ -133,10 +133,10 @@ resource "null_resource" "validate_resource_limits" {
       condition = alltrue([
         for dev, t in coalesce(try(var.vm_profile.io, null), {}) :
         alltrue([
-          try(t.read_bytes_sec,   0) >= 0,
-          try(t.write_bytes_sec,  0) >= 0,
-          try(t.read_iops_sec,    0) >= 0,
-          try(t.write_iops_sec,   0) >= 0,
+          try(t.read_bytes_sec, 0) >= 0,
+          try(t.write_bytes_sec, 0) >= 0,
+          try(t.read_iops_sec, 0) >= 0,
+          try(t.write_iops_sec, 0) >= 0,
         ])
       ])
       error_message = "vm_profile.io.<dev>.* values must be >= 0 (0 = unlimited) [vm_name:${var.name}]"
@@ -162,7 +162,7 @@ resource "null_resource" "validate_resource_limits" {
         for iface, cfg in coalesce(try(var.vm_profile.network, null), {}) : [
           for u in compact([
             try(cfg.rate_unit, null),
-            try(cfg.inbound.average_unit,  null), try(cfg.inbound.peak_unit,  null), try(cfg.inbound.burst_unit,  null), try(cfg.inbound.floor_unit,  null),
+            try(cfg.inbound.average_unit, null), try(cfg.inbound.peak_unit, null), try(cfg.inbound.burst_unit, null), try(cfg.inbound.floor_unit, null),
             try(cfg.outbound.average_unit, null), try(cfg.outbound.peak_unit, null), try(cfg.outbound.burst_unit, null), try(cfg.outbound.floor_unit, null),
           ]) : contains(["KB", "MB", "GB"], u)
         ]

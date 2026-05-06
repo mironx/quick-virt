@@ -6,7 +6,7 @@ resource "null_resource" "validate" {
     }
 
     precondition {
-      condition = var.os_profile != null || var.os_image_mode == "url" || fileexists(local.selected_os.image)
+      condition     = var.os_profile != null || var.os_image_mode == "url" || fileexists(local.selected_os.image)
       error_message = <<-EOT
         Image file not found: ${local.selected_os.image}
         [volume_name:${var.volume_name}, os_name:${coalesce(var.os_name, "none")}, image_mode:${var.os_image_mode}]

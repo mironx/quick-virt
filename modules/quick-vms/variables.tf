@@ -71,8 +71,9 @@ variable "machines" {
         }))
       })))
 
-      enable_config = optional(bool, true)
-      enable_live   = optional(bool, false)
+      enable_config    = optional(bool, true)
+      enable_live      = optional(bool, false)
+      enable_ssh_files = optional(bool, true)
     })
     main_storage = optional(object({
       size = optional(number, 20)
@@ -81,12 +82,12 @@ variable "machines" {
       name     = string
       password = string
     })
-    cloud_init_user_data_path          = optional(string)
-    cloud_init_user_data_template      = optional(string)
+    cloud_init_user_data_path           = optional(string)
+    cloud_init_user_data_template       = optional(string)
     cloud_init_user_data_after_path     = optional(string)
     cloud_init_user_data_after_template = optional(string)
-    run_before = optional(list(string), [])
-    run_after  = optional(list(string), [])
+    run_before                          = optional(list(string), [])
+    run_after                           = optional(list(string), [])
 
     os_volume = optional(object({
       path    = string
@@ -101,7 +102,7 @@ variable "machines" {
         fs_type          = string
       })
     }))
-    os_name    = optional(string)
+    os_name = optional(string)
     os_profile = optional(object({
       image            = string
       network_template = optional(string, "netplan")
