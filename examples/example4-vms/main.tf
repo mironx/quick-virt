@@ -12,6 +12,21 @@ provider "libvirt" {
 
 locals {
   prefix = "qvms-ex4"
+
+  ssh = {
+    user          = "ubuntu"
+    identity_file = "~/.ssh/id_rsa"
+  }
+
+  user_data_master = templatefile("${path.module}/templates/master-user-data.tmpl", {
+    user_name     = local.ssh.user
+    user_password = "ubuntu123"
+  })
+
+  user_data_worker = templatefile("${path.module}/templates/worker-user-data.tmpl", {
+    user_name     = local.ssh.user
+    user_password = "ubuntu123"
+  })
 }
 
 module "vms" {
@@ -33,11 +48,8 @@ module "vms" {
       main_storage = {
         size = 30
       }
-      user = {
-        name     = "ubuntu"
-        password = "ubuntu123"
-      }
-      cloud_init_user_data_path = "./templates/master-user-data.tmpl"
+      user_data = local.user_data_master
+      ssh       = local.ssh
       nodes = [
         {
           name        = "v1"
@@ -75,11 +87,8 @@ module "vms" {
       main_storage = {
         size = 40
       }
-      user = {
-        name     = "ubuntu"
-        password = "ubuntu123"
-      }
-      cloud_init_user_data_path = "./templates/worker-user-data.tmpl"
+      user_data = local.user_data_worker
+      ssh       = local.ssh
       nodes = [
         {
           name        = "v1"

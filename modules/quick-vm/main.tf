@@ -773,7 +773,8 @@ resource "local_file" "limits_gitignore" {
 
 locals {
   ssh_files_enabled = try(var.vm_profile.enable_ssh_files, true)
-  ssh_identity_file = coalesce(var.ssh_identity_file, "~/.ssh/id_rsa")
+  ssh_user_value    = try(var.ssh.user, null)
+  ssh_identity_file = coalesce(try(var.ssh.identity_file, null), "~/.ssh/id_rsa")
 
   _ssh_entries_raw = [
     for idx, net in var.networks :
@@ -784,7 +785,7 @@ locals {
   ]
   ssh_entries = [for e in local._ssh_entries_raw : e if e != null]
 
-  ssh_has_entries = local.ssh_files_enabled && var.ssh_user != null && length(local.ssh_entries) > 0
+  ssh_has_entries = local.ssh_files_enabled && local.ssh_user_value != null && local.ssh_user_value != "" && length(local.ssh_entries) > 0
 }
 
 resource "local_file" "ssh_config" {
@@ -794,7 +795,7 @@ resource "local_file" "ssh_config" {
   content = templatefile("${path.module}/templates/ssh-config.conf.tmpl", {
     vm_name       = var.name
     entries       = local.ssh_entries
-    ssh_user      = var.ssh_user
+    ssh_user      = local.ssh_user_value
     identity_file = local.ssh_identity_file
   })
 }

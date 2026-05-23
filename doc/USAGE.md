@@ -159,6 +159,7 @@ Provisions one KVM domain with cloud-init, dynamic networks, shared folders, and
 | `user_data_after` | `string` | no | `null` | Extra `#cloud-config` appended after shared folders |
 | `main_storage` | `object({ size })` | no | `null` | Main disk size in GiB |
 | `memory_backing` | `object` | no | `{}` | See [Memory backing](#memory-backing) |
+| `ssh` | `object({ user, identity_file, public_key })` | no | `null` | SSH helper config — generates `.qv-ssh/qv-ssh.config.<vm>.conf` host-side. `public_key` is a passthrough convenience field — re-use it in your `templatefile()`. |
 | `running` / `autostart` | `bool` | no | `true` / `false` | Power state & host-boot autostart |
 
 **Outputs**
@@ -207,9 +208,9 @@ Provisions **sets of VMs** (e.g. `masters`, `workers`) sharing OS image, profile
 A machine set supports every `quick-vm` knob (OS/image/disk modes, `shared_folders`, `run_before`/`run_after`, `memory_backing`, etc.) plus:
 
 - `set_name` — VM name prefix (`${set_name}-${node.name}`)
-- `user = { name, password }` — passed into cloud-init templates
-- `cloud_init_user_data_path` or `cloud_init_user_data_template` — the `user-data` template
-- `cloud_init_user_data_after_path` / `cloud_init_user_data_after_template` — optional "after" template
+- `user_data` — **pre-rendered** cloud-init `#cloud-config` (string, required). Render with `templatefile()` in your root module — `quick-vms` no longer renders templates itself.
+- `user_data_after` — optional pre-rendered "after" cloud-config fragment
+- `ssh = { user, identity_file, public_key }` — optional SSH helper config; used **only** to emit host-side `.qv-ssh/qv-ssh.config.<vm>.conf`. `public_key` is a convenience field — re-use it in your `templatefile()` call for `ssh-authorized-keys`.
 
 **Outputs**
 
@@ -219,6 +220,26 @@ A machine set supports every `quick-vm` knob (OS/image/disk modes, `shared_folde
 **Example**
 
 ```hcl
+locals {
+  ssh = {
+    user          = "ubuntu"
+    identity_file = "~/.ssh/id_rsa"
+    public_key    = file("~/.ssh/id_rsa.pub")
+  }
+
+  user_data_master = templatefile("./templates/master-user-data.tmpl", {
+    user_name     = local.ssh.user
+    user_password = "ubuntu123"
+    ssh_pub_key   = local.ssh.public_key
+  })
+
+  user_data_worker = templatefile("./templates/worker-user-data.tmpl", {
+    user_name     = local.ssh.user
+    user_password = "ubuntu123"
+    ssh_pub_key   = local.ssh.public_key
+  })
+}
+
 module "vms" {
   source       = "git::https://github.com/mironx/quick-virt.git//modules/quick-vms?ref=main"
   kvm-networks = {
@@ -228,22 +249,22 @@ module "vms" {
 
   machines = {
     masters = {
-      set_name = "demo-master"
-      os_name  = "ubuntu_22"
+      set_name   = "demo-master"
+      os_name    = "ubuntu_22"
       vm_profile = { vcpu = 1, memory = 2048 }
-      user = { name = "ubuntu", password = "ubuntu123" }
-      cloud_init_user_data_path = "./templates/master-user-data.tmpl"
+      user_data  = local.user_data_master
+      ssh        = local.ssh
       nodes = [
         { name = "v1", networks = [{ profile_name = "qvexample-neta-loc-2", ip = "192.168.201.3" }] },
         { name = "v2", networks = [{ profile_name = "qvexample-neta-loc-2", ip = "192.168.201.4" }] },
       ]
     }
     workers = {
-      set_name = "demo-worker"
-      os_name  = "ubuntu_22"
+      set_name   = "demo-worker"
+      os_name    = "ubuntu_22"
       vm_profile = { vcpu = 3, memory = 4096 }
-      user = { name = "ubuntu", password = "ubuntu123" }
-      cloud_init_user_data_path = "./templates/worker-user-data.tmpl"
+      user_data  = local.user_data_worker
+      ssh        = local.ssh
       nodes = [
         { name = "v1", networks = [{ profile_name = "qvexample-neta-loc-2", ip = "192.168.201.33" }] },
       ]
@@ -271,6 +292,8 @@ module "net_info" {
 
 ### SSH helper files (`.qv-ssh/`)
 
+> **Breaking change (latest version):** `ssh_user` / `ssh_identity_file` (single inputs) and `user = { name, password }` + `cloud_init_user_data_path` (in `quick-vms`) are **gone**. Both modules now take a single `ssh = { user, identity_file, public_key }` block plus a pre-rendered `user_data` string (render with `templatefile()` in your root module). See migration in [`examples/example4-vms`](../examples/example4-vms), [`example5-vms`](../examples/example5-vms), [`example6-vms`](../examples/example6-vms).
+
 Every VM that has at least one network IP assigned gets two helper files written into `path.root/.qv-ssh/` — both emitted per-VM by `quick-vm` (keyed by the full VM name, which is `<set>-<node>` when created via `quick-vms`):
 
 | File | Purpose |
@@ -281,8 +304,10 @@ Every VM that has at least one network IP assigned gets two helper files written
 **Flags / inputs:**
 
 - `vm_profile.enable_ssh_files` (default `true`) — set to `false` on a `quick-vms` set (or `quick-vm` instance) to skip helper file generation.
-- `ssh_user` (on `quick-vm` — forwarded automatically by `quick-vms` from `machines[*].user.name`) — fills the `User` line in the config fragment. When `null`, no helper files are generated.
-- `ssh_identity_file` (on `quick-vm`) — `IdentityFile` directive. Defaults to `~/.ssh/id_rsa`.
+- `ssh = { user, identity_file, public_key }` (on both `quick-vm` and `quick-vms`):
+  - `ssh.user` — `User` directive in the config fragment. **Required** for files to be emitted; when `null`, no helpers are generated.
+  - `ssh.identity_file` — `IdentityFile` directive. Defaults to `~/.ssh/id_rsa`.
+  - `ssh.public_key` — **convenience passthrough** (not consumed by the module). Re-use it in your `templatefile()` call to drive `ssh-authorized-keys` in cloud-init.
 
 **Typical use:**
 
@@ -589,8 +614,8 @@ module "cluster" {
       set_name   = "demo-worker"
       os_name    = "ubuntu_22"
       vm_profile = { vcpu = 2, memory = 4096 }
-      user       = { name = "ubuntu", password = "ubuntu123" }
-      cloud_init_user_data_path = "./templates/worker-user-data.tmpl"
+      user_data  = local.user_data_worker   # rendered with templatefile() in your locals
+      ssh        = local.ssh
 
       nfs_mounts = [
         { host = "172.16.0.1", source = "/home/devx/vm-shares", target = "vm-shares" }

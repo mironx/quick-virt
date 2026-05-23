@@ -39,9 +39,18 @@ locals {
     "qvexample-net-bridge" = { enabled = false }
   }
 
+  # SSH config — single source of truth for: ssh-config files (host-side) AND
+  # cloud-init authorized_keys / Linux user creation (re-used in templatefile()).
+  ssh = {
+    user          = "ubuntu"
+    identity_file = "~/.ssh/id_rsa"
+    public_key    = file("~/.ssh/id_rsa.pub")
+  }
+
   user_data = templatefile("${path.module}/templates/user-data.tmpl", {
-    user_name     = "ubuntu"
+    user_name     = local.ssh.user
     user_password = "ubuntu123"
+    ssh_pub_key   = local.ssh.public_key
   })
 
   base_profile = {
@@ -58,6 +67,7 @@ module "vm_loose" {
   name         = "${local.prefix}-loose"
   os_name      = "ubuntu_22"
   user_data    = local.user_data
+  ssh          = local.ssh
   vm_profile   = local.base_profile
   kvm-networks = local.kvm_networks
   networks = [
@@ -80,9 +90,9 @@ module "vm_loose" {
 module "vm_throttled" {
   source       = "../../modules/quick-vm"
   name         = "${local.prefix}-throttled"
-  ssh_identity_file = ""
   os_name      = "ubuntu_22"
   user_data    = local.user_data
+  ssh          = local.ssh
   kvm-networks = local.kvm_networks
 
   vm_profile = merge(local.base_profile, {
@@ -201,8 +211,8 @@ module "vms_workers" {
         enable_live   = true
       }
 
-      user                      = { name = "ubuntu", password = "ubuntu123" }
-      cloud_init_user_data_path = "./templates/user-data.tmpl"
+      user_data = local.user_data    # rendered by root module — quick-vms no longer renders templates
+      ssh       = local.ssh          # SSH helper config (host-side ssh-config files)
 
       nodes = [
         { name = "v1", networks = [

@@ -18,8 +18,13 @@ locals {
     "qvexample-net-bridge" = { enabled = false }
   }
 
+  ssh = {
+    user          = "ubuntu"
+    identity_file = "~/.ssh/id_rsa"
+  }
+
   user_data = templatefile("${path.module}/templates/user-data.tmpl", {
-    user_name     = "ubuntu"
+    user_name     = local.ssh.user
     user_password = "ubuntu123"
   })
 }
@@ -44,11 +49,8 @@ module "vms_A" {
         vcpu   = 1
         memory = 2048
       }
-      user = {
-        name     = "ubuntu"
-        password = "ubuntu123"
-      }
-      cloud_init_user_data_path = "./templates/user-data.tmpl"
+      user_data = local.user_data
+      ssh       = local.ssh
       shared_folders = [
         { source = "${abspath(path.module)}/vmdata", target = "vmdata" }
       ]
@@ -85,11 +87,8 @@ module "vms_B" {
         vcpu   = 2
         memory = 4096
       }
-      user = {
-        name     = "ubuntu"
-        password = "ubuntu123"
-      }
-      cloud_init_user_data_path = "./templates/user-data.tmpl"
+      user_data = local.user_data
+      ssh       = local.ssh
       shared_folders = [
         { source = "${abspath(path.module)}/vmdata", target = "vmdata" }
       ]
@@ -128,11 +127,8 @@ module "vms_C" {
         vcpu   = 1
         memory = 2048
       }
-      user = {
-        name     = "ubuntu"
-        password = "ubuntu123"
-      }
-      cloud_init_user_data_path = "./templates/user-data.tmpl"
+      user_data = local.user_data
+      ssh       = local.ssh
       nodes = [
         {
           name = "v1"
@@ -172,11 +168,8 @@ module "vms_D" {
         vcpu   = 1
         memory = 2048
       }
-      user = {
-        name     = "ubuntu"
-        password = "ubuntu123"
-      }
-      cloud_init_user_data_path = "./templates/user-data.tmpl"
+      user_data = local.user_data
+      ssh       = local.ssh
       nodes = [
         {
           name = "v1"
