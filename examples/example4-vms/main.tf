@@ -136,39 +136,3 @@ output "kvm_network_profiles" {
   description = "Resolved network profiles"
   value       = module.vms.kvm-network-profiles
 }
-
-//-------------------------------------------------------------------------------
-// Ansible inventory — masters/workers from quick-vms + custom "super" group
-// holding worker-v1 and worker-v2 (multi-group: they stay in workers too).
-//-------------------------------------------------------------------------------
-
-module "ansible_add_super" {
-  source     = "../../modules/quick-access-ansible/helpers/add_vms_to_group"
-  groups     = module.vms.vms_info_by_set
-  group_name = "super"
-  vms = [
-    for vm in module.vms.vms_info_by_set["workers"] : vm
-    if contains(["${local.prefix}-worker-v1", "${local.prefix}-worker-v2"], vm.name)
-  ]
-}
-
-module "ansible" {
-  source = "../../modules/quick-access-ansible"
-  groups = module.ansible_add_super.groups
-  ssh = {
-    user          = local.ssh.user
-    identity_file = local.ssh.identity_file
-    password      = "ubuntu123"
-  }
-  primary_network = "qvexample-neta-loc-2"
-}
-
-output "ansible_inventory_path" {
-  description = "Path to the generated Ansible inventory"
-  value       = module.ansible.inventory_path
-}
-
-output "ansible_groups" {
-  description = "Group membership (debug view)"
-  value       = module.ansible.groups
-}

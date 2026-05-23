@@ -27,10 +27,7 @@ locals {
   vms = [
     for vm in local._unique_vms : merge(vm, {
       primary_ip = coalesce(
-        var.primary_network == null ? null : try(
-          [for n in vm.networks : n.ip if n.profile_name == var.primary_network][0],
-          null,
-        ),
+        try([for n in vm.networks : n.ip if n.profile_name == var.primary_network][0], null),
         try(vm.networks[0].ip, null),
       )
     })
@@ -42,10 +39,7 @@ locals {
     group_name => distinct([for v in vms : v.name])
   }
 
-  output_path = coalesce(
-    var.output_file,
-    "${path.root}/.qv-access/${var.inventory_filename}"
-  )
+  output_path = "${path.root}/.qv-access/${var.inventory_filename}"
 }
 
 //-------------------------------------------------------------------------------

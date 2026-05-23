@@ -27,22 +27,24 @@ variable "ssh" {
 
 variable "primary_network" {
   description = <<-EOT
-    Profile name of the network to use as ansible_host for each VM.
+    Profile name of the network used as ansible_host for each VM (required).
     If a VM does not have this network attached, falls back to networks[0].ip.
-    When null (default), every VM uses networks[0].ip.
   EOT
   type        = string
-  default     = null
-}
 
-variable "output_file" {
-  description = "Destination path for the generated inventory file."
-  type        = string
-  default     = null
+  validation {
+    condition     = length(var.primary_network) > 0
+    error_message = "primary_network must be a non-empty string."
+  }
 }
 
 variable "inventory_filename" {
-  description = "Filename used when output_file is null. Placed under <path.root>/.qv-access/."
+  description = "Filename for the generated inventory. Placed under <path.root>/.qv-access/."
   type        = string
   default     = "inventory.ini"
+
+  validation {
+    condition     = length(var.inventory_filename) > 0
+    error_message = "inventory_filename must be a non-empty string."
+  }
 }
