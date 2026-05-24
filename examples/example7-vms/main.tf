@@ -49,7 +49,6 @@ module "vms" {
         size = 30
       }
       user_data = local.user_data_master
-      ssh       = local.ssh
       nodes = [
         {
           name        = "v1"
@@ -88,7 +87,6 @@ module "vms" {
         size = 40
       }
       user_data = local.user_data_worker
-      ssh       = local.ssh
       nodes = [
         {
           name        = "v1"
@@ -158,7 +156,6 @@ module "vm_extra" {
     { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.120" },
     { profile_name = "qvexample-net-bridge", ip = "172.20.0.120" },
   ]
-  ssh = local.ssh
 }
 
 //-------------------------------------------------------------------------------

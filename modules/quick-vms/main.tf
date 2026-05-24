@@ -130,7 +130,6 @@ module "vms" {
         memory_backing  = set_val.memory_backing
         shared_folders  = set_val.shared_folders
         nfs_mounts      = set_val.nfs_mounts
-        ssh             = try(set_val.ssh, null)
         node            = node
       }
     }
@@ -154,7 +153,6 @@ module "vms" {
   memory_backing  = each.value.memory_backing
   shared_folders = each.value.shared_folders
   nfs_mounts     = each.value.nfs_mounts
-  ssh            = each.value.ssh
 
   networks = [
     for net in each.value.node.networks : {

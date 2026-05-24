@@ -39,8 +39,8 @@ locals {
     "qvexample-net-bridge" = { enabled = false }
   }
 
-  # SSH config — single source of truth for: ssh-config files (host-side) AND
-  # cloud-init authorized_keys / Linux user creation (re-used in templatefile()).
+  # SSH config — re-used in templatefile() for cloud-init authorized_keys /
+  # Linux user creation.
   ssh = {
     user          = "ubuntu"
     identity_file = "~/.ssh/id_rsa"
@@ -67,7 +67,6 @@ module "vm_loose" {
   name         = "${local.prefix}-loose"
   os_name      = "ubuntu_22"
   user_data    = local.user_data
-  ssh          = local.ssh
   vm_profile   = local.base_profile
   kvm-networks = local.kvm_networks
   networks = [
@@ -92,7 +91,6 @@ module "vm_throttled" {
   name         = "${local.prefix}-throttled"
   os_name      = "ubuntu_22"
   user_data    = local.user_data
-  ssh          = local.ssh
   kvm-networks = local.kvm_networks
 
   vm_profile = merge(local.base_profile, {
@@ -212,7 +210,6 @@ module "vms_workers" {
       }
 
       user_data = local.user_data    # rendered by root module — quick-vms no longer renders templates
-      ssh       = local.ssh          # SSH helper config (host-side ssh-config files)
 
       nodes = [
         { name = "v1", networks = [

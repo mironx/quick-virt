@@ -50,7 +50,6 @@ module "vms_A" {
         memory = 2048
       }
       user_data = local.user_data
-      ssh       = local.ssh
       shared_folders = [
         { source = "${abspath(path.module)}/vmdata", target = "vmdata" }
       ]
@@ -88,7 +87,6 @@ module "vms_B" {
         memory = 4096
       }
       user_data = local.user_data
-      ssh       = local.ssh
       shared_folders = [
         { source = "${abspath(path.module)}/vmdata", target = "vmdata" }
       ]
@@ -128,7 +126,6 @@ module "vms_C" {
         memory = 2048
       }
       user_data = local.user_data
-      ssh       = local.ssh
       nodes = [
         {
           name = "v1"
@@ -169,7 +166,6 @@ module "vms_D" {
         memory = 2048
       }
       user_data = local.user_data
-      ssh       = local.ssh
       nodes = [
         {
           name = "v1"

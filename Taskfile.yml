@@ -121,46 +121,6 @@ tasks:
     cmd: sudo {{.SCRIPTS_DIR}}/tools/clean-kvm-network.sh
 
   # ---------------------------------------------------------------------------
-  # SSH helpers — compose .qv-ssh/ fragments into one importable file
-  # ---------------------------------------------------------------------------
-  ssh:compose:
-    desc: 'Combine all *.conf fragments in <DIR>/.qv-ssh/ into a single vms.compose-conf (optional DIR=<path>, default=.)'
-    cmd: |
-      set -e
-      DIR="{{.DIR | default "."}}"
-      QV_DIR="$DIR/.qv-ssh"
-      OUT="$QV_DIR/vms.compose-conf"
-
-      if [ ! -d "$QV_DIR" ]; then
-        echo "[error] directory not found: $QV_DIR" >&2
-        exit 1
-      fi
-
-      shopt -s nullglob
-      files=("$QV_DIR"/*.conf)
-
-      rm -f "$OUT"
-      {
-        echo "# Auto-composed by 'task ssh:compose'"
-        echo "# Source: $QV_DIR"
-        if [ "${#files[@]}" -eq 0 ]; then
-          echo "# (no *.conf fragments found)"
-        else
-          echo "# Fragments:"
-          for f in "${files[@]}"; do
-            echo "#   - $(basename "$f")"
-          done
-          echo
-          for f in "${files[@]}"; do
-            cat "$f"
-            echo
-          done
-        fi
-      } > "$OUT"
-
-      echo "[ok] composed ${#files[@]} fragment(s) into $OUT"
-
-  # ---------------------------------------------------------------------------
   # Scaffold — bootstrap boilerplate configs into a target directory
   # ---------------------------------------------------------------------------
   scaffold:init-cloud-config:

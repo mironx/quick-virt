@@ -71,9 +71,8 @@ variable "machines" {
         }))
       })))
 
-      enable_config    = optional(bool, true)
-      enable_live      = optional(bool, false)
-      enable_ssh_files = optional(bool, true)
+      enable_config = optional(bool, true)
+      enable_live   = optional(bool, false)
     })
     main_storage = optional(object({
       size = optional(number, 20)
@@ -82,18 +81,6 @@ variable "machines" {
     # in your root module — quick-vms no longer renders templates internally.
     user_data       = string
     user_data_after = optional(string)
-
-    # SSH helper config — used ONLY for host-side login helpers in .qv-ssh/.
-    # `user`          → "User"          line in qv-ssh.config.<vm>.conf
-    # `identity_file` → "IdentityFile"  line (default: ~/.ssh/id_rsa)
-    # `public_key`    → not consumed by the module; convenience field for organising
-    #                   SSH-related values. Re-use in your templatefile() for cloud-init.
-    # When ssh.user is null, no SSH helper files are emitted.
-    ssh = optional(object({
-      user          = optional(string)
-      identity_file = optional(string)
-      public_key    = optional(string)
-    }))
 
     run_before = optional(list(string), [])
     run_after  = optional(list(string), [])
@@ -153,5 +140,5 @@ variable "machines" {
       })), [])
     }))
   }))
-  description = "Map of machine sets. Each set provides a pre-rendered cloud-init user_data, optional ssh helper config, and a list of nodes. Templates are rendered by the root module — quick-vms no longer renders cloud-init internally."
+  description = "Map of machine sets. Each set provides a pre-rendered cloud-init user_data and a list of nodes. Templates are rendered by the root module — quick-vms no longer renders cloud-init internally."
 }

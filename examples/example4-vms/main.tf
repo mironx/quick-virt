@@ -49,7 +49,6 @@ module "vms" {
         size = 30
       }
       user_data = local.user_data_master
-      ssh       = local.ssh
       nodes = [
         {
           name        = "v1"
@@ -88,7 +87,6 @@ module "vms" {
         size = 40
       }
       user_data = local.user_data_worker
-      ssh       = local.ssh
       nodes = [
         {
           name        = "v1"

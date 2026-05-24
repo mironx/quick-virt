@@ -140,30 +140,7 @@ variable "vm_profile" {
     # enable_live  : write sidecar .ini + .sh into path.root/.qv-limits/ (for live-apply via virsh).
     enable_config = optional(bool, true)
     enable_live   = optional(bool, false)
-
-    # enable_ssh_files: emit ssh-config / hosts fragments + install/uninstall
-    # scripts into path.root/.qv-ssh/. Set to false to skip SSH helper files.
-    enable_ssh_files = optional(bool, true)
   })
-}
-
-variable "ssh" {
-  description = <<-EOT
-    SSH helper configuration. Used **only** for generating host-side login helpers in `path.root/.qv-ssh/`:
-      - `user`          → "User" directive in qv-ssh.config.<vm>.conf
-      - `identity_file` → "IdentityFile" directive in qv-ssh.config.<vm>.conf
-      - `public_key`    → not used by the module; provided as a convenience field so
-                          you can pass it to your own templatefile() call (e.g.
-                          ssh-authorized-keys in cloud-init). Holding it here keeps
-                          all SSH-related config in one place.
-    When null or `user` is null/empty, no SSH helper files are emitted.
-  EOT
-  type = object({
-    user          = optional(string)
-    identity_file = optional(string)
-    public_key    = optional(string)
-  })
-  default = null
 }
 
 variable "memory_backing" {
