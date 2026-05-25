@@ -13,6 +13,10 @@ provider "libvirt" {
 locals {
   prefix = "qvms-ex4"
 
+  # Demo-only password — accessible via `virsh console <vm>` when SSH or
+  # cloud-init is still booting. DO NOT reuse outside local KVM dev.
+  user_password = "demo123"
+
   kvm_networks = {
     "qvexample-neta-loc-2" = { enabled = true }
     "qvexample-net-bridge" = { enabled = true }
@@ -25,13 +29,13 @@ locals {
 
   user_data_master = templatefile("${path.module}/templates/master-user-data.tmpl", {
     user_name     = local.ssh.user
-    user_password = "ubuntu123"
+    user_password = local.user_password
     ssh_pub_key   = local.ssh.public_key
   })
 
   user_data_worker = templatefile("${path.module}/templates/worker-user-data.tmpl", {
     user_name     = local.ssh.user
-    user_password = "ubuntu123"
+    user_password = local.user_password
     ssh_pub_key   = local.ssh.public_key
   })
 }
