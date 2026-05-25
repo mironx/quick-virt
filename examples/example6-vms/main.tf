@@ -35,12 +35,22 @@ locals {
 
   kvm_networks = {
     "qvexample-neta-loc-1" = { enabled = true }
+    "qvexample-neta-loc-2" = { enabled = true }
     "qvexample-net-bridge" = { enabled = false }
   }
 
+  # SSH config — re-used in templatefile() for cloud-init authorized_keys /
+  # Linux user creation.
+  ssh = {
+    user          = "ubuntu"
+    identity_file = "~/.ssh/id_rsa"
+    public_key    = file("~/.ssh/id_rsa.pub")
+  }
+
   user_data = templatefile("${path.module}/templates/user-data.tmpl", {
-    user_name     = "ubuntu"
+    user_name     = local.ssh.user
     user_password = "ubuntu123"
+    ssh_pub_key   = local.ssh.public_key
   })
 
   base_profile = {
@@ -61,6 +71,7 @@ module "vm_loose" {
   kvm-networks = local.kvm_networks
   networks = [
     { profile_name = "qvexample-neta-loc-1", ip = "192.168.200.90" },
+    { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.90" },
     { profile_name = "qvexample-net-bridge", ip = "172.16.0.90" }
   ]
 }
@@ -85,43 +96,43 @@ module "vm_throttled" {
   vm_profile = merge(local.base_profile, {
     cpu = {
       limit = {
-        percent = 25           # 25% of total allocated CPU capacity (~0.5 of 2 vCPU)
+        percent = 25 # 25% of total allocated CPU capacity (~0.5 of 2 vCPU)
       }
     }
 
     io = {
       vda = {
-        bytes_unit = "MB"        # all *_bytes_sec* fields below are in MiB
+        bytes_unit = "MB" # all *_bytes_sec* fields below are in MiB
 
         # Baseline — sustained throughput
         read_bytes_sec  = 10
-        write_bytes_sec =  5
+        write_bytes_sec = 5
         read_iops_sec   = 1000
         write_iops_sec  = 500
 
         # Burst — short spikes above baseline
-        read_bytes_sec_max          = 20           # 20 MiB/s peak
-        read_bytes_sec_max_length   = 5            # for 5 seconds
-        write_bytes_sec_max         = 10
-        write_bytes_sec_max_length  = 5
-        read_iops_sec_max           = 2000
-        read_iops_sec_max_length    = 5
-        write_iops_sec_max          = 1000
-        write_iops_sec_max_length   = 5
+        read_bytes_sec_max         = 20 # 20 MiB/s peak
+        read_bytes_sec_max_length  = 5  # for 5 seconds
+        write_bytes_sec_max        = 10
+        write_bytes_sec_max_length = 5
+        read_iops_sec_max          = 2000
+        read_iops_sec_max_length   = 5
+        write_iops_sec_max         = 1000
+        write_iops_sec_max_length  = 5
       }
     }
 
     # Per-interface network bandwidth throttle (key = index in networks[])
     network = {
-      "0" = {                                     # first interface (qvexample-neta-loc-1)
-        rate_unit = "MB"                          # 1 MiB/s = 1024 KiB/s
+      "0" = {            # first interface (qvexample-neta-loc-1)
+        rate_unit = "MB" # 1 MiB/s = 1024 KiB/s
         inbound = {
-          average = 10                            #  10 MiB/s sustained download
-          peak    = 50                            #  50 MiB/s burst peak
-          burst   = 1                             #   1 MiB burst bucket
+          average = 10 #  10 MiB/s sustained download
+          peak    = 50 #  50 MiB/s burst peak
+          burst   = 1  #   1 MiB burst bucket
         }
         outbound = {
-          average = 5                             #   5 MiB/s sustained upload
+          average = 5 #   5 MiB/s sustained upload
           peak    = 20
           burst   = 1
         }
@@ -134,6 +145,7 @@ module "vm_throttled" {
 
   networks = [
     { profile_name = "qvexample-neta-loc-1", ip = "192.168.200.91" },
+    { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.91" },
     { profile_name = "qvexample-net-bridge", ip = "172.16.0.91" }
   ]
 }
@@ -174,7 +186,7 @@ module "vms_workers" {
 
         cpu = {
           limit = {
-            percent = 50   # 50% of allocated CPU — moderate throttle per worker
+            percent = 50 # 50% of allocated CPU — moderate throttle per worker
           }
         }
 
@@ -197,20 +209,22 @@ module "vms_workers" {
         enable_live   = true
       }
 
-      user = { name = "ubuntu", password = "ubuntu123" }
-      cloud_init_user_data_path = "./templates/user-data.tmpl"
+      user_data = local.user_data    # rendered by root module — quick-vms no longer renders templates
 
       nodes = [
         { name = "v1", networks = [
           { profile_name = "qvexample-neta-loc-1", ip = "192.168.200.92" },
+          { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.92" },
           { profile_name = "qvexample-net-bridge", ip = "172.16.0.92" },
         ] },
         { name = "v2", networks = [
           { profile_name = "qvexample-neta-loc-1", ip = "192.168.200.93" },
+          { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.93" },
           { profile_name = "qvexample-net-bridge", ip = "172.16.0.93" },
         ] },
         { name = "v3", networks = [
           { profile_name = "qvexample-neta-loc-1", ip = "192.168.200.94" },
+          { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.94" },
           { profile_name = "qvexample-net-bridge", ip = "172.16.0.94" },
         ] },
       ]

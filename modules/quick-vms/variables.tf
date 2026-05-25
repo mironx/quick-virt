@@ -77,14 +77,11 @@ variable "machines" {
     main_storage = optional(object({
       size = optional(number, 20)
     }))
-    user = object({
-      name     = string
-      password = string
-    })
-    cloud_init_user_data_path          = optional(string)
-    cloud_init_user_data_template      = optional(string)
-    cloud_init_user_data_after_path     = optional(string)
-    cloud_init_user_data_after_template = optional(string)
+    # Pre-rendered cloud-init payloads (string). Render with `templatefile()`
+    # in your root module — quick-vms no longer renders templates internally.
+    user_data       = string
+    user_data_after = optional(string)
+
     run_before = optional(list(string), [])
     run_after  = optional(list(string), [])
 
@@ -101,7 +98,7 @@ variable "machines" {
         fs_type          = string
       })
     }))
-    os_name    = optional(string)
+    os_name = optional(string)
     os_profile = optional(object({
       image            = string
       network_template = optional(string, "netplan")
@@ -143,5 +140,5 @@ variable "machines" {
       })), [])
     }))
   }))
-  description = "Map of machine configurations including VM and user profile."
+  description = "Map of machine sets. Each set provides a pre-rendered cloud-init user_data and a list of nodes. Templates are rendered by the root module — quick-vms no longer renders cloud-init internally."
 }

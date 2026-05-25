@@ -55,7 +55,7 @@ locals {
     interface_naming = var.os_profile.interface_naming
     interface_offset = try(var.os_profile.interface_offset, 3)
     fs_type          = try(var.os_profile.fs_type, "virtiofs")
-  } : {
+    } : {
     image            = var.os_image_mode == "local" ? local._builtin_os.image_local : local._builtin_os.image_url
     network_template = local._builtin_os.network_template
     interface_naming = local._builtin_os.interface_naming
