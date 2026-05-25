@@ -29,7 +29,11 @@ locals {
   })
 }
 
-module "vms" {
+//-------------------------------------------------------------------------------
+// vms1 — first quick-vms instance: masters + workers, 2 nodes per group
+//-------------------------------------------------------------------------------
+
+module "vms1" {
   source = "../../modules/quick-vms"
 
   kvm-networks = {
@@ -39,7 +43,7 @@ module "vms" {
 
   machines = {
     masters = {
-      set_name = "${local.prefix}-master"
+      set_name = "vms1-${local.prefix}-master"
       os_name  = "ubuntu_22"
       vm_profile = {
         vcpu   = 1
@@ -65,19 +69,11 @@ module "vms" {
             { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.101" },
             { profile_name = "qvexample-net-bridge", ip = "172.20.0.101" }
           ]
-        },
-        {
-          name        = "v3"
-          description = "black virtual machine"
-          networks = [
-            { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.102" },
-            { profile_name = "qvexample-net-bridge", ip = "172.20.0.102" }
-          ]
         }
       ]
     }
     workers = {
-      set_name = "${local.prefix}-worker"
+      set_name = "vms1-${local.prefix}-worker"
       os_name  = "ubuntu_22"
       vm_profile = {
         vcpu   = 3
@@ -103,21 +99,81 @@ module "vms" {
             { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.111" },
             { profile_name = "qvexample-net-bridge", ip = "172.20.0.111" }
           ]
-        },
+        }
+      ]
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------
+// vms2 — second quick-vms instance: databases + cache, 2 nodes per group
+//-------------------------------------------------------------------------------
+
+module "vms2" {
+  source = "../../modules/quick-vms"
+
+  kvm-networks = {
+    "qvexample-neta-loc-2" = { enabled = true }
+    "qvexample-net-bridge" = { enabled = true }
+  }
+
+  machines = {
+    masters = {
+      set_name = "vms2-${local.prefix}-master"
+      os_name  = "ubuntu_22"
+      vm_profile = {
+        vcpu   = 1
+        memory = 2048
+      }
+      main_storage = {
+        size = 30
+      }
+      user_data = local.user_data_master
+      nodes = [
         {
-          name        = "v3"
+          name        = "v1"
           description = "black virtual machine"
           networks = [
-            { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.112" },
-            { profile_name = "qvexample-net-bridge", ip = "172.20.0.112" }
+            { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.100" },
+            { profile_name = "qvexample-net-bridge", ip = "172.20.0.100" }
           ]
         },
         {
-          name        = "v4"
+          name        = "v2"
           description = "black virtual machine"
           networks = [
-            { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.113" },
-            { profile_name = "qvexample-net-bridge", ip = "172.20.0.113" }
+            { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.101" },
+            { profile_name = "qvexample-net-bridge", ip = "172.20.0.101" }
+          ]
+        }
+      ]
+    }
+    workers = {
+      set_name = "vms2-${local.prefix}-worker"
+      os_name  = "ubuntu_22"
+      vm_profile = {
+        vcpu   = 3
+        memory = 4048
+      }
+      main_storage = {
+        size = 40
+      }
+      user_data = local.user_data_worker
+      nodes = [
+        {
+          name        = "v1"
+          description = "black virtual machine"
+          networks = [
+            { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.110" },
+            { profile_name = "qvexample-net-bridge", ip = "172.20.0.110" }
+          ]
+        },
+        {
+          name        = "v2"
+          description = "black virtual machine"
+          networks = [
+            { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.111" },
+            { profile_name = "qvexample-net-bridge", ip = "172.20.0.111" }
           ]
         }
       ]
@@ -126,17 +182,20 @@ module "vms" {
 }
 
 output "all_vms_info" {
-  description = "Info for all VMs created by set_vms"
-  value       = module.vms.vms_info
+  description = "Info for all VMs from both quick-vms instances"
+  value = {
+    vms1 = module.vms1.vms_info_by_set
+    vms2 = module.vms2.vms_info_by_set
+  }
 }
 
 output "kvm_network_profiles" {
   description = "Resolved network profiles"
-  value       = module.vms.kvm-network-profiles
+  value       = module.vms1.kvm-network-profiles
 }
 
 //-------------------------------------------------------------------------------
-// Standalone VM (quick-vm) — same networks as the quick-vms cluster above.
+// Standalone VM (quick-vm) — same networks as the quick-vms clusters above.
 //-------------------------------------------------------------------------------
 
 module "vm_extra" {
@@ -153,20 +212,37 @@ module "vm_extra" {
     "qvexample-net-bridge" = { enabled = true }
   }
   networks = [
-    { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.120" },
-    { profile_name = "qvexample-net-bridge", ip = "172.20.0.120" },
+    { profile_name = "qvexample-neta-loc-2", ip = "192.168.201.150" },
+    { profile_name = "qvexample-net-bridge", ip = "172.20.0.150" },
   ]
 }
 
 //-------------------------------------------------------------------------------
-// Ansible inventory — masters/workers from quick-vms + custom "super" group
-// holding worker-v1 and worker-v2. The standalone vm_extra is added to ALL
-// three groups by chaining add_vms_to_group.
+// Merged base groups — concat lists on overlapping keys (built-in merge() would
+// override one list with the other; merge_groups helper concatenates them).
+//-------------------------------------------------------------------------------
+
+module "merge_groups" {
+  source = "../../modules/quick-access-ansible/helpers/merge_groups"
+  group_maps = [
+    module.vms1.vms_info_by_set,
+    module.vms2.vms_info_by_set,
+  ]
+}
+
+locals {
+  base_groups = module.merge_groups.groups
+}
+
+//-------------------------------------------------------------------------------
+// Ansible inventory — base groups + custom "super" group (worker-v1, worker-v2)
+// + "nodes" group (all cluster VMs from both vms1 and vms2).
+// The standalone vm_extra is added to masters, workers, and super.
 //-------------------------------------------------------------------------------
 
 module "ansible_add_extra_to_masters" {
   source     = "../../modules/quick-access-ansible/helpers/add_vms_to_group"
-  groups     = module.vms.vms_info_by_set
+  groups     = local.base_groups
   group_name = "masters"
   vms        = [module.vm_extra.vm_info]
 }
@@ -184,7 +260,7 @@ module "ansible_add_super" {
   group_name = "super"
   vms = concat(
     [
-      for vm in module.vms.vms_info_by_set["workers"] : vm
+      for vm in module.vms1.vms_info_by_set["workers"] : vm
       if contains(["${local.prefix}-worker-v1", "${local.prefix}-worker-v2"], vm.name)
     ],
     [module.vm_extra.vm_info],
@@ -195,10 +271,7 @@ module "ansible_add_nodes" {
   source     = "../../modules/quick-access-ansible/helpers/add_vms_to_group"
   groups     = module.ansible_add_super.groups
   group_name = "nodes"
-  vms = concat(
-    module.vms.vms_info_by_set["masters"],
-    module.vms.vms_info_by_set["workers"],
-  )
+  vms        = flatten(values(local.base_groups))
 }
 
 module "ansible" {
@@ -220,4 +293,26 @@ output "ansible_inventory_path" {
 output "ansible_groups" {
   description = "Group membership (debug view)"
   value       = module.ansible.groups
+}
+
+//-------------------------------------------------------------------------------
+// /etc/hosts-style file — all VMs from vms1 + vms2 + vm_extra; group keys
+// ignored, deduped by name.
+//-------------------------------------------------------------------------------
+
+module "hosts" {
+  source = "../../modules/quick-access-hosts"
+  groups = merge(
+    local.base_groups,
+    { extra = [module.vm_extra.vm_info] },
+  )
+  primary_network = "qvexample-neta-loc-2"
+  network_aliases = {
+    "qvexample-net-bridge" = "br"
+  }
+}
+
+output "hosts_path" {
+  description = "Path to the generated hosts file"
+  value       = module.hosts.hosts_path
 }
