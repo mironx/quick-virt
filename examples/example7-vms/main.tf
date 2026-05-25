@@ -316,3 +316,29 @@ output "hosts_path" {
   description = "Path to the generated hosts file"
   value       = module.hosts.hosts_path
 }
+
+//-------------------------------------------------------------------------------
+// SSH config — all VMs (cluster + extra), bare-name on primary network, ".br"
+// suffix on bridge.
+//-------------------------------------------------------------------------------
+
+module "ssh" {
+  source = "../../modules/quick-access-ssh"
+  groups = merge(
+    local.base_groups,
+    { extra = [module.vm_extra.vm_info] },
+  )
+  ssh = {
+    user          = local.ssh.user
+    identity_file = local.ssh.identity_file
+  }
+  primary_network = "qvexample-neta-loc-2"
+  network_aliases = {
+    "qvexample-net-bridge" = "br"
+  }
+}
+
+output "ssh_config_path" {
+  description = "Path to the generated ssh-config file"
+  value       = module.ssh.ssh_config_path
+}
