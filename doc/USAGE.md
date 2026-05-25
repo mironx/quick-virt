@@ -12,7 +12,7 @@ End-to-end reference for the `quick-virt` Terraform modules with working example
   - [`quick-vm` — single VM](#quick-vm--single-vm)
   - [`quick-vms` — multiple VMs (sets)](#quick-vms--multiple-vms-sets)
   - [`quick-kvm-network-reader` — read existing network](#quick-kvm-network-reader--read-existing-network)
-  - [SSH helper files (`.qv-ssh/`)](#ssh-helper-files-qv-ssh)
+  - [Access helpers (`.qv-access/`)](#access-helpers-qv-access)
 - [Feature deep dives](#feature-deep-dives)
   - [OS profiles (built-in vs custom)](#os-profiles-built-in-vs-custom)
   - [Shared base volume (`os_volume`)](#shared-base-volume-os_volume)
@@ -159,7 +159,6 @@ Provisions one KVM domain with cloud-init, dynamic networks, shared folders, and
 | `user_data_after` | `string` | no | `null` | Extra `#cloud-config` appended after shared folders |
 | `main_storage` | `object({ size })` | no | `null` | Main disk size in GiB |
 | `memory_backing` | `object` | no | `{}` | See [Memory backing](#memory-backing) |
-| `ssh` | `object({ user, identity_file, public_key })` | no | `null` | SSH helper config — generates `.qv-ssh/qv-ssh.config.<vm>.conf` host-side. `public_key` is a passthrough convenience field — re-use it in your `templatefile()`. |
 | `running` / `autostart` | `bool` | no | `true` / `false` | Power state & host-boot autostart |
 
 **Outputs**
@@ -210,7 +209,6 @@ A machine set supports every `quick-vm` knob (OS/image/disk modes, `shared_folde
 - `set_name` — VM name prefix (`${set_name}-${node.name}`)
 - `user_data` — **pre-rendered** cloud-init `#cloud-config` (string, required). Render with `templatefile()` in your root module — `quick-vms` no longer renders templates itself.
 - `user_data_after` — optional pre-rendered "after" cloud-config fragment
-- `ssh = { user, identity_file, public_key }` — optional SSH helper config; used **only** to emit host-side `.qv-ssh/qv-ssh.config.<vm>.conf`. `public_key` is a convenience field — re-use it in your `templatefile()` call for `ssh-authorized-keys`.
 
 **Outputs**
 
@@ -253,7 +251,6 @@ module "vms" {
       os_name    = "ubuntu_22"
       vm_profile = { vcpu = 1, memory = 2048 }
       user_data  = local.user_data_master
-      ssh        = local.ssh
       nodes = [
         { name = "v1", networks = [{ profile_name = "qvexample-neta-loc-2", ip = "192.168.201.3" }] },
         { name = "v2", networks = [{ profile_name = "qvexample-neta-loc-2", ip = "192.168.201.4" }] },
@@ -264,7 +261,6 @@ module "vms" {
       os_name    = "ubuntu_22"
       vm_profile = { vcpu = 3, memory = 4096 }
       user_data  = local.user_data_worker
-      ssh        = local.ssh
       nodes = [
         { name = "v1", networks = [{ profile_name = "qvexample-neta-loc-2", ip = "192.168.201.33" }] },
       ]
@@ -290,35 +286,210 @@ module "net_info" {
 }
 ```
 
-### SSH helper files (`.qv-ssh/`)
+### Access helpers (`.qv-access/`)
 
-> **Breaking change (latest version):** `ssh_user` / `ssh_identity_file` (single inputs) and `user = { name, password }` + `cloud_init_user_data_path` (in `quick-vms`) are **gone**. Both modules now take a single `ssh = { user, identity_file, public_key }` block plus a pre-rendered `user_data` string (render with `templatefile()` in your root module). See migration in [`examples/example4-vms`](../examples/example4-vms), [`example5-vms`](../examples/example5-vms), [`example6-vms`](../examples/example6-vms).
+Three sibling modules that **consume the VM info exposed by `quick-vm` / `quick-vms`** and render one file each into `path.root/.qv-access/` — SSH client config, `/etc/hosts`-style aliases, and an Ansible inventory. Each module is independently usable; mix and match as needed.
 
-Every VM that has at least one network IP assigned gets two helper files written into `path.root/.qv-ssh/` — both emitted per-VM by `quick-vm` (keyed by the full VM name, which is `<set>-<node>` when created via `quick-vms`):
+| Module | Output file | What it generates |
+|--------|-------------|-------------------|
+| [`quick-access-ssh`](#quick-access-ssh) | `.qv-access/ssh-config` | One `Host` block per VM (primary + suffixed aliases for secondary nets) |
+| [`quick-access-hosts`](#quick-access-hosts) | `.qv-access/hosts` | One line per VM in `/etc/hosts` format |
+| [`quick-access-ansible`](#quick-access-ansible) | `.qv-access/inventory.ini` | Ansible inventory with groups + `[all:vars]` SSH settings |
 
-| File | Purpose |
-|------|---------|
-| `qv-ssh.config.<vm>.conf` | SSH config fragment: one `Host` block per network interface (alias: `<vm>-net<idx>-<profile>`) |
-| `qv-ssh.hosts.<vm>.hosts` | `/etc/hosts`-style lines for the same aliases |
+> **Migration from old `.qv-ssh/` per-VM helpers:** earlier versions emitted `qv-ssh.config.<vm>.conf` from inside `quick-vm`/`quick-vms` via an `ssh = {...}` block. Both that block and the per-VM emission are **removed**. Render the access files explicitly with the modules below, fed from `module.vms.vms_info_by_set` (or `module.vm.vm_info` for a single VM). End-to-end migration is shown in [`examples/example7-vms`](../examples/example7-vms).
 
-**Flags / inputs:**
+#### Shared input shape — `groups`
 
-- `vm_profile.enable_ssh_files` (default `true`) — set to `false` on a `quick-vms` set (or `quick-vm` instance) to skip helper file generation.
-- `ssh = { user, identity_file, public_key }` (on both `quick-vm` and `quick-vms`):
-  - `ssh.user` — `User` directive in the config fragment. **Required** for files to be emitted; when `null`, no helpers are generated.
-  - `ssh.identity_file` — `IdentityFile` directive. Defaults to `~/.ssh/id_rsa`.
-  - `ssh.public_key` — **convenience passthrough** (not consumed by the module). Re-use it in your `templatefile()` call to drive `ssh-authorized-keys` in cloud-init.
+All three modules take a `groups = map(list(vm_info))` input — the keys are group/set names, the values are lists of VM-info objects emitted by `quick-vm.vm_info` or `quick-vms.vms_info_by_set`.
 
-**Typical use:**
+- `quick-access-ssh` and `quick-access-hosts` **ignore the group structure** (they dedupe by VM name and render one flat file). Group keys are kept for API parity.
+- `quick-access-ansible` **honours the groups** as Ansible inventory groups; a VM can appear in multiple groups.
+
+Building a `groups` map:
+
+```hcl
+# from a single quick-vms instance:
+groups = module.vms.vms_info_by_set
+
+# adding a standalone quick-vm to a group:
+groups = merge(
+  module.vms.vms_info_by_set,
+  { extra = [module.vm_extra.vm_info] },
+)
+
+# merging two quick-vms instances with overlapping keys (use the helper —
+# Terraform's built-in merge() would replace one list with the other):
+module "merge" {
+  source     = "git::https://github.com/mironx/quick-virt.git//modules/quick-access-ansible/helpers/merge_groups?ref=main"
+  group_maps = [module.vms1.vms_info_by_set, module.vms2.vms_info_by_set]
+}
+# module.merge.groups → { masters = [a, b, e, f], workers = [c, d, g, h] }
+```
+
+---
+
+#### `quick-access-ssh`
+
+Renders a single `ssh-config` file with one `Host` block per VM (primary network → bare name) and, by default, one extra `Host <vm>.<suffix>` per non-primary interface.
+
+**Source:** `modules/quick-access-ssh`
+
+**Inputs**
+
+| Name | Type | Required | Default | Description |
+|------|------|:---:|---------|-------------|
+| `groups` | `map(list(vm_info))` | no | `{}` | Group → VM-list map; dedup by VM name on render |
+| `ssh` | `object({ user, identity_file })` | yes | — | Emitted in every `Host` block. `identity_file` defaults to `~/.ssh/id_rsa` |
+| `primary_network` | `string` | yes | — | Profile name whose IP becomes the bare `Host <vm>` HostName. Falls back to `networks[0].ip` for VMs that don't have it attached |
+| `emit_secondary_networks` | `bool` | no | `true` | When `true`, each non-primary network adds `Host <vm>.<suffix>` |
+| `network_aliases` | `map(string)` | no | `{}` | Map of `profile_name => suffix`. Missing profiles use the full profile name |
+| `relaxed_host_keys` | `bool` | no | `true` | Adds `StrictHostKeyChecking no` + `UserKnownHostsFile /dev/null` per Host (convenient for dev VMs that get recreated) |
+| `ssh_config_filename` | `string` | no | `"ssh-config"` | Filename under `.qv-access/` |
+
+**Outputs**
+
+- `ssh_config_path` — absolute path to the generated file
+- `vms` — per-VM resolved entries (debug)
+
+**Example**
+
+```hcl
+module "ssh" {
+  source = "git::https://github.com/mironx/quick-virt.git//modules/quick-access-ssh?ref=main"
+  groups = merge(
+    module.vms.vms_info_by_set,
+    { extra = [module.vm_extra.vm_info] },
+  )
+  ssh = {
+    user          = "ubuntu"
+    identity_file = "~/.ssh/id_rsa"
+  }
+  primary_network = "qvexample-neta-loc-2"
+  network_aliases = {
+    "qvexample-net-bridge" = "br"
+  }
+}
+```
 
 ```bash
-# direct: pass the fragment as an SSH config file
-ssh -F .qv-ssh/qv-ssh.config.<vm>.conf <vm>-net0-<profile>
-
-# or wire into ~/.ssh/config manually:
-#   Include /abs/path/to/.qv-ssh/qv-ssh.config.<vm>.conf
-# and append .qv-ssh/qv-ssh.hosts.<vm>.txt to /etc/hosts as needed.
+# Usage:
+ssh -F .qv-access/ssh-config <vm-name>        # primary network
+ssh -F .qv-access/ssh-config <vm-name>.br     # bridge alias
 ```
+
+---
+
+#### `quick-access-hosts`
+
+Same input contract as `quick-access-ssh`, renders a `/etc/hosts`-style file. Suffixes work the same way.
+
+**Source:** `modules/quick-access-hosts`
+
+**Inputs**
+
+| Name | Type | Required | Default | Description |
+|------|------|:---:|---------|-------------|
+| `groups` | `map(list(vm_info))` | no | `{}` | Group → VM-list map; dedup by VM name on render |
+| `primary_network` | `string` | yes | — | Profile name whose IP becomes the bare `<vm>` hosts line |
+| `emit_secondary_networks` | `bool` | no | `true` | When `true`, each non-primary network adds `<vm>.<suffix>` |
+| `network_aliases` | `map(string)` | no | `{}` | Map of `profile_name => suffix` |
+| `hosts_filename` | `string` | no | `"hosts"` | Filename under `.qv-access/` |
+
+**Outputs**
+
+- `hosts_path` — absolute path to the generated file
+- `vms` — per-VM resolved entries
+
+**Example output (`.qv-access/hosts`):**
+
+```
+# demo-master-v1
+192.168.201.3    demo-master-v1
+172.20.0.17      demo-master-v1.br
+```
+
+Append it to `/etc/hosts` (or symlink) when you want bare names usable outside SSH.
+
+---
+
+#### `quick-access-ansible`
+
+Renders an Ansible `inventory.ini` with groups preserved (unlike `ssh`/`hosts` which dedupe to a flat file). `ansible_host` is the VM's IP on `primary_network` (falls back to `networks[0].ip` if missing).
+
+**Source:** `modules/quick-access-ansible`
+
+**Inputs**
+
+| Name | Type | Required | Default | Description |
+|------|------|:---:|---------|-------------|
+| `groups` | `map(list(vm_info))` | no | `{}` | Group → VM-list. **Preserved** as Ansible groups; multi-group membership allowed |
+| `ssh` | `object({ user, identity_file, password?, become_password? })` | yes | — | Emitted under `[all:vars]` (`ansible_user`, `ansible_ssh_private_key_file`, optional `ansible_password` / `ansible_become_password`) |
+| `primary_network` | `string` | yes | — | Profile name used for `ansible_host` |
+| `inventory_filename` | `string` | no | `"inventory.ini"` | Filename under `.qv-access/` |
+
+**Outputs**
+
+- `inventory_path` — absolute path
+- `vms` — deduped VM list with resolved `primary_ip` (debug)
+- `groups` — group → VM-name list (debug)
+
+**Example**
+
+```hcl
+module "ansible" {
+  source = "git::https://github.com/mironx/quick-virt.git//modules/quick-access-ansible?ref=main"
+  groups = module.vms.vms_info_by_set
+  ssh = {
+    user          = "ubuntu"
+    identity_file = "~/.ssh/id_rsa"
+    password      = "demo123"        # optional — for `ansible_password`
+  }
+  primary_network = "qvexample-neta-loc-2"
+}
+```
+
+```bash
+# Usage:
+ansible -i .qv-access/inventory.ini all -m ping
+ansible-playbook -i .qv-access/inventory.ini site.yml
+```
+
+---
+
+#### Group helpers (`quick-access-ansible/helpers/`)
+
+Two tiny pure-Terraform helpers for assembling the `groups` map without resorting to inline `merge()` / `concat()` gymnastics.
+
+##### `merge_groups`
+
+Merges N `groups` maps; on overlapping keys, lists are **concatenated** (not replaced like Terraform's built-in `merge()`).
+
+```hcl
+module "merge" {
+  source     = "git::https://github.com/mironx/quick-virt.git//modules/quick-access-ansible/helpers/merge_groups?ref=main"
+  group_maps = [
+    module.vms1.vms_info_by_set,    # { masters = [a, b], workers = [c, d] }
+    module.vms2.vms_info_by_set,    # { masters = [e, f], cache    = [g, h] }
+  ]
+}
+# module.merge.groups → { masters = [a, b, e, f], workers = [c, d], cache = [g, h] }
+```
+
+##### `add_vms_to_group`
+
+Appends a list of VMs to a named group (created if missing). Existing members preserved.
+
+```hcl
+module "add_extra_to_masters" {
+  source     = "git::https://github.com/mironx/quick-virt.git//modules/quick-access-ansible/helpers/add_vms_to_group?ref=main"
+  groups     = module.merge.groups
+  group_name = "masters"
+  vms        = [module.vm_extra.vm_info]
+}
+# module.add_extra_to_masters.groups feeds the next helper / quick-access-* module
+```
+
+Chain these in sequence to build complex inventories (custom groups, supersets, all-nodes). End-to-end pattern in [`examples/example7-vms`](../examples/example7-vms).
 
 ---
 
