@@ -26,7 +26,7 @@ The `quick-vms` module creates a **set of VMs** based on a machines configuratio
 
 - Provisioning of multiple VMs with shared or standalone OS volumes
 - Network profile reading and filtering via `kvm-networks` map
-- SSH helper files in `.qv-ssh/` (per-VM fragments + install/uninstall scripts, plus set-level orchestrators) — see [`doc/USAGE.md`](./USAGE.md)
+- Access helpers (`.qv-access/`) — render `ssh-config`, `/etc/hosts`, and Ansible inventory via [`quick-access-ssh`](./USAGE.md#quick-access-ssh) / [`quick-access-hosts`](./USAGE.md#quick-access-hosts) / [`quick-access-ansible`](./USAGE.md#quick-access-ansible)
 
 Ensure your cloud-init configuration includes your **public SSH key** to enable passwordless access.
 
@@ -36,11 +36,14 @@ Each module is located in the [`modules`](../modules) directory:
 
 | Module | Description |
 |--------|-------------|
-| [`quick-vm`](../modules/quick-vm) | Provision a single VM with dynamic networks, OS profiles, disk modes, and per-VM SSH helper files |
-| [`quick-vms`](../modules/quick-vms) | Provision multiple VMs with shared network config and set-level SSH helper orchestrators |
+| [`quick-vm`](../modules/quick-vm) | Provision a single VM with dynamic networks, OS profiles, and disk modes |
+| [`quick-vms`](../modules/quick-vms) | Provision multiple VMs as named sets sharing OS image and profile |
 | [`quick-os-volume`](../modules/quick-os-volume) | Create shared base OS volume for thin provisioning across VMs |
 | [`quick-networks`](../modules/quick-networks) | Create KVM virtual networks (NAT and bridge) |
 | [`quick-kvm-network-reader`](../modules/quick-kvm-network-reader) | Read and expose KVM network info via shell script |
+| [`quick-access-ssh`](../modules/quick-access-ssh) | Render an `ssh-config` (one file per deployment) from `vms_info` groups |
+| [`quick-access-hosts`](../modules/quick-access-hosts) | Render an `/etc/hosts`-style file from `vms_info` groups |
+| [`quick-access-ansible`](../modules/quick-access-ansible) | Render an Ansible `inventory.ini` with groups + `[all:vars]` SSH/become config |
 
 ## Examples
 
@@ -55,3 +58,5 @@ The [`examples`](../examples) directory demonstrates how to use the modules:
 | [`example3c-vm`](../examples/example3c-vm) | OS image modes: shared os_volume, standalone os_name, custom os_profile |
 | [`example4-vms`](../examples/example4-vms) | Multiple VMs (masters + workers) with quick-vms |
 | [`example5-vms`](../examples/example5-vms) | Multiple quick-vms instances sharing one base volume, clone vs backing_store |
+| [`example6-vms`](../examples/example6-vms) | Resource limits — CPU & I/O throttling (`vm_profile.cpu.limit` / `io`), live apply via virsh |
+| [`example7-vms`](../examples/example7-vms) | Multiple quick-vms instances + standalone VM, with `quick-access-ssh`/`hosts`/`ansible` and group helpers |

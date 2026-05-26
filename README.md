@@ -14,8 +14,9 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fi
 - Dynamic network configuration — attach N interfaces per VM with global enable/disable.
 - Built-in OS profiles (Ubuntu 22/24, Rocky 9, Debian 12) with local or URL image modes.
 - Shared base volumes via `quick-os-volume` — one download, many thin VMs.
-- SSH and hosts file generation for easy access and connectivity.
+- SSH, hosts, and Ansible inventory generation via `quick-access-*` (emitted to `.qv-access/`).
 - Graceful validation with actionable error messages.
+- Per-VM resource limits — CPU, I/O & network throttling via libvirt domain XML and live-apply scripts (`.qv-limits/`).
 - Task runner (`Taskfile`) for common operations including OS image management.
 - Includes helper scripts for system setup and recovery.
 
