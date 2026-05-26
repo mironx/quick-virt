@@ -123,6 +123,31 @@ Useful helpers once networks exist:
 | 3 | `task scaffold:init-cloud-config DIR=./templates` | Creates a cloud-init `user-data` template with your SSH key | Once per new example — bootstraps the cloud-init template. |
 | 4 | `task scaffold:init-networks DIR=./my-networks` | Scaffolds a Terraform project for KVM networks (pinned to installed version) | Once per environment — see step 3 of this guide. |
 
+### 7. Resource limits — live apply
+
+When `vm_profile.enable_live = true` is set on a `quick-vm` or `quick-vms` set, `terraform apply` emits sidecar scripts under your project's `.qv-limits/` directory. These let you re-apply CPU / I/O / network throttling **without rebooting the VM** — the apply script reads `qv-limits.spec.<vm>.ini` (a hand-editable INI) and runs `virsh schedinfo` / `virsh blkdeviotune` / `virsh domiftune --live --config`.
+
+| File | Purpose |
+|------|---------|
+| `qv-limits.spec.<vm>.ini` | Runtime spec — edit `[cpu]` mode (PERCENT/RAW), tweak IO/burst values, re-run `apply` |
+| `qv-limits.apply.<vm>.sh` | Apply all limits to one VM live |
+| `qv-limits.clear.<vm>.sh` | Clear every limit on one VM live |
+| `qv-limits.apply-all.<set>.sh` | Apply to every node in a `quick-vms` set |
+| `qv-limits.clear-all.<set>.sh` | Clear on every node in a set |
+
+```bash
+# Run from your project directory (where .qv-limits/ lives):
+bash .qv-limits/qv-limits.apply.<vm-name>.sh
+bash .qv-limits/qv-limits.clear.<vm-name>.sh
+
+# Whole 'workers' set at once:
+bash .qv-limits/qv-limits.apply-all.<set-name>.sh
+```
+
+> Each `terraform apply` **regenerates** the `.ini` from `vm_profile`. If you tweak it for live testing and want the change to survive, fold it back into your HCL.
+
+Full input schema (`vm_profile.cpu.limit`, `vm_profile.io.<dev>`, `vm_profile.network.<idx>`) — see [`doc/USAGE.md` → Resource limits](./USAGE.md#resource-limits--cpu-io--network-throttling).
+
 ## Scripts
 
 Shell scripts that back the tasks (you can also invoke them directly):

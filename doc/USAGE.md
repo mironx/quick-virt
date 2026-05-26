@@ -24,7 +24,7 @@ End-to-end reference for the `quick-virt` Terraform modules with working example
   - [NFS mounts (`nfs_mounts`)](#nfs-mounts-nfs_mounts)
   - [Cloud-init hooks (`run_before`, `run_after`, `user_data_after`)](#cloud-init-hooks-run_before-run_after-user_data_after)
   - [Memory backing](#memory-backing)
-  - [Resource limits — CPU & I/O throttling (`cpu.limit`, `io`)](#resource-limits--cpu--io-throttling-cpulimit-io)
+  - [Resource limits — CPU, I/O & network throttling](#resource-limits--cpu-io--network-throttling)
 
 ---
 
@@ -142,7 +142,7 @@ Provisions one KVM domain with cloud-init, dynamic networks, shared folders, and
 | Name | Type | Required | Default | Description |
 |------|------|:---:|---------|-------------|
 | `name` | `string` | yes | — | VM name |
-| `vm_profile` | `object({ vcpu, memory, cpu, io, enable_config, enable_live })` | yes | — | Compute profile + optional CPU/I/O throttling — see [Resource limits](#resource-limits--cpu--io-throttling-cpulimit-io) |
+| `vm_profile` | `object({ vcpu, memory, cpu, io, enable_config, enable_live })` | yes | — | Compute profile + optional CPU/I/O throttling — see [Resource limits](#resource-limits--cpu-io--network-throttling) |
 | `user_data` | `string` | yes | — | Rendered cloud-init `#cloud-config` |
 | `networks` | `list(object)` | no | `[]` | Attached networks (order = interface order) |
 | `kvm-networks` | `map(object)` | no | `{}` | Global enable/disable + optional manual profile override |
@@ -891,7 +891,7 @@ Turn `shared = false` only when you're sure you don't use shared folders **and**
 
 ---
 
-### Resource limits — CPU & I/O throttling (`cpu.limit`, `io`)
+### Resource limits — CPU, I/O & network throttling
 
 Cap how much CPU time and disk I/O a VM can consume — independent from the `vcpu`/`memory` allocation. Useful for reproducing cloud-like resource contention on a dev box, stress-testing apps under slow I/O, or just preventing one noisy VM from starving the host.
 

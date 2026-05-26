@@ -33,6 +33,17 @@ quick-virt/
 └── doc/                          # Documentation
 ```
 
+## Runtime artifacts
+
+Two directories appear under your Terraform project root (`path.root`) after `terraform apply`:
+
+| Directory | Created by | What it holds |
+|-----------|------------|---------------|
+| `.qv-access/` | `quick-access-ssh` / `quick-access-hosts` / `quick-access-ansible` | `ssh-config`, `hosts`, `inventory.ini` — fed by `vms_info` groups |
+| `.qv-limits/` | `quick-vm` / `quick-vms` when `vm_profile.enable_live = true` | `qv-limits.spec.<vm>.ini` (editable runtime spec), `qv-limits.apply.<vm>.sh`, `qv-limits.clear.<vm>.sh`, set-level `apply-all` / `clear-all` scripts |
+
+Both directories ship their own `.gitignore` (`*`), so generated content stays out of version control.
+
 ## Modules
 
 ### quick-vm
