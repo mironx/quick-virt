@@ -1036,10 +1036,12 @@ bash .qv-limits/qv-throttle.clear.sh .qv-limits/lab-throttle.ini
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `percent` | number | — | Percentage of total allocated CPU. `percent = 100` ≈ full allocation, no throttle. |
-| `period_us` | number | `100000` | CFS period in microseconds (kernel scheduler window). |
-| `quota_us` | number | computed from `percent` | CFS quota in microseconds. If set, overrides `percent`. |
-| `shares` | number | libvirt default (1024) | Relative weight under contention (soft priority, not a hard cap). |
+| `percent` | number | — | **HARD cap.** Percentage of total allocated CPU. `percent = 100` ≈ full allocation, no throttle. |
+| `period_us` | number | `100000` | **HARD cap.** CFS period in microseconds (kernel scheduler window). |
+| `quota_us` | number | computed from `percent` | **HARD cap.** CFS quota in microseconds. If set, overrides `percent`. |
+| `shares` | number | libvirt default (1024) | **SOFT priority** — relative weight under CPU contention. **NOT a hard cap.** |
+
+> ⚠ **`shares` is NOT a CPU limit.** It only affects scheduling priority when multiple VMs compete for the same physical CPUs — VMs with higher `shares` get scheduled more often, but a VM with `shares = 100` on an otherwise-idle host can still consume 100% CPU. For a real cap use `percent` or `period_us`+`quota_us`. Libvirt range: 2-262144, default 1024.
 
 Formula: `quota_us = vcpu × period_us × percent / 100`.
 Example: `vcpu=4, percent=25, period_us=100000` → `quota_us=100000` (= 1 core-equivalent).
@@ -1211,3 +1213,17 @@ Clear mode zeroes every attached NIC (no-op on NICs that were never throttled).
 | `enable_config` | `true` | Inject `vm_profile.{cpu,io,network}` values into the libvirt domain XML via native `cpu_tune`, `disks[*].io_tune`, and per-interface `<bandwidth>`. Persistent — survives VM restart. |
 
 For the live-apply path (sidecar `.ini` + `qv-throttle.{apply,clear}.sh`), see the [`quick-throttle*` triplet](#path-b--quick-throttle-triplet-sidecar-live-apply-workflow) above.
+
+#### Edge cases / silent failures
+
+Things that **don't error** at `terraform apply` or `apply.sh` but quietly produce no effect — easy to miss when debugging "why isn't my limit working":
+
+| Field / scenario | Symptom | Reason |
+|---|---|---|
+| `vm_profile.io.vdb` (or any non-vda) with `enable_config = true` | Throttle silently ignored | Path A only wires `disks[0]` (vda) into `<iotune>`. Multi-disk support is Path B territory (`disk_configs[name] = map(dev → throttle)`). Tracked: [`to-improve-limits.md` #5](./to-improve-limits.md). |
+| `network.<idx>.outbound.floor` on a bridge / non-QoS network | No error, no effect | `<bandwidth><outbound floor>` is only honored on NAT networks with QoS enabled. Bridge mode bypasses libvirt's QoS layer. Use `inbound`+`outbound` `average`/`peak`/`burst` instead. |
+| IO `*_max` (burst) attrs with `enable_config = true` | May be rejected by provider | dmacvicar/libvirt 0.9.x iotune schema may not accept all burst attributes. If you need burst, use Path B (`quick-throttle` profile + `qv-throttle.apply.sh`) where they're applied via `virsh blkdeviotune`. |
+| Network throttle (Path B) survives VM reboot | No — only `--live` is applied | `apply.sh` omits `--config` for `domiftune` because the inactive XML lacks `<target dev='vnetN'/>` (runtime alias). CPU and disk axes DO persist via `--config`. |
+| Editing `<prefix>-throttle.ini` while `vms` set changes | Edits lost in changed sections | quick-throttle-apply regenerates the mapping when `vms` membership / disks / networks change. Manual assignments in unchanged sections survive; changed sections reset to `null`. |
+| `cpu.limit.shares` "doesn't cap my CPU" | Working as designed | `shares` is **soft priority** under contention, not a hard cap (see warning above). For a real CPU cap use `percent` or `period_us`+`quota_us`. |
+| `cpu.limit.percent = 200` accepted historically | Now rejected | Added validation (Terraform `validation` block) — `percent` must be in `[1, 100]`. Similar checks: `period_us > 0`, `bytes_unit ∈ {B,KB,MB,GB}`, `rate_unit ∈ {KB,MB,GB}`, `outbound.floor <= outbound.average`. |

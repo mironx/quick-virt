@@ -63,25 +63,21 @@ module "throttle_apply" {
 The module reads only three fields from each VM: `name`, `disks`, `networks[*].index`.
 Pass `quick-vm.vm_info` directly — extra fields are tolerated and ignored.
 
-## Bootstrap-only semantics — what to expect
+## Bootstrap-only semantics — state drift
 
 After `terraform apply`:
 - File is created if missing, with all-null values
-- File is **regenerated** if the set of VMs (or their disks/networks) changed
-  → your manual edits in changed sections are lost
-- File is **untouched** if VM set is unchanged (deterministic sort by VM name
-  ensures stable content)
+- File is **regenerated on every apply** — `local_file` overwrites content to match HCL even if you edited the file in between (terraform's `lifecycle.ignore_changes = [content]` does NOT prevent this for `local_file`; the provider rewrites the file when state-content differs from disk)
+- Workaround for chaos sessions: avoid running `terraform apply` between editing the mapping and running `qv-throttle.apply.sh`. Once `apply.sh` has fired, throttles are in cgroups + libvirt XML — terraform regenerating the mapping `.ini` doesn't undo them (only future `apply.sh` runs read the regenerated file)
 
-For chaos sessions: avoid running `terraform apply` mid-session. Make your
-edits, run downstream apply.sh, observe, iterate, then revert via apply.sh
-clear (when implemented).
+Tracked as a future improvement requiring a `null_resource` + `local-exec` pattern (or similar) — see [`doc/limits-roadmap.md` → Tier 3](../../doc/limits-roadmap.md).
 
 ## Outputs
 
 | Output | Type | Description |
 |---|---|---|
-| `mapping_file` | `string` | path to throttle.ini |
-| `vm_names` | `list(string)` | sorted VM names in the mapping |
+| `mapping_file` | `string` | Path to throttle.ini |
+| `vm_names` | `list(string)` | Sorted VM names in the mapping |
 
 ## Related modules
 

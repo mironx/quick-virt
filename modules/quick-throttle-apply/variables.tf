@@ -26,6 +26,7 @@ variable "available_profiles" {
   default     = { cpu = [], disk = [], network = [] }
 }
 
+
 variable "vms" {
   type        = any
   description = <<-EOT
