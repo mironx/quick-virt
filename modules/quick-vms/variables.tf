@@ -71,8 +71,9 @@ variable "machines" {
         }))
       })))
 
+      # `enable_live` was removed — use quick-throttle* module triplet for
+      # live-apply workflow. `enable_config` retained (XML inject path).
       enable_config = optional(bool, true)
-      enable_live   = optional(bool, false)
     })
     main_storage = optional(object({
       size = optional(number, 20)

@@ -137,9 +137,10 @@ variable "vm_profile" {
     })))
 
     # enable_config: inject <cputune> / <iotune> / <bandwidth> into the domain XML (persistent).
-    # enable_live  : write sidecar .ini + .sh into path.root/.qv-limits/ (for live-apply via virsh).
+    # Previous `enable_live` field (sidecar .ini/.sh generation) was removed —
+    # use the quick-throttle / quick-throttle-apply / quick-throttle-runner
+    # module triplet for the live-apply workflow.
     enable_config = optional(bool, true)
-    enable_live   = optional(bool, false)
   })
 }
 

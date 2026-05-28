@@ -531,7 +531,6 @@ locals {
   } : {}
 
   limits_enable_config = try(var.vm_profile.enable_config, true)
-  limits_enable_live   = try(var.vm_profile.enable_live, false)
 
   has_any_limit = local.cpu_limit_enabled || length(local.io_limits) > 0 || length(local.net_limits) > 0
 
@@ -561,40 +560,10 @@ locals {
     write_iops_sec_max_length  = local._io_vda.write_iops_sec_max_length
   } : null
 
-  # ----------------------- Sidecar files (for enable_live = true) -----------------------
-  limits_ini = local.has_any_limit && local.limits_enable_live ? templatefile(
-    "${path.module}/templates/limits-spec.ini.tmpl",
-    {
-      vm_name            = var.name
-      vcpu               = var.vm_profile.vcpu
-      generated_at       = formatdate("YYYY-MM-DD'T'hh:mm:ss'Z'", timestamp())
-      quick_virt_version = "dev"
-      enable_config      = local.limits_enable_config
-      enable_live        = local.limits_enable_live
-      cpu_limit          = local.cpu_limit
-      io_limits          = local.io_limits
-      net_limits         = local.net_limits
-    }
-  ) : ""
-
-  limits_sh = local.has_any_limit && local.limits_enable_live ? templatefile(
-    "${path.module}/templates/limits-apply.sh.tmpl",
-    {
-      vm_name    = var.name
-      cpu_limit  = local.cpu_limit
-      io_limits  = local.io_limits
-      net_limits = local.net_limits
-    }
-  ) : ""
-
-  # Clear-all counterpart — emitted whenever enable_live is on, independent of
-  # whether limits are currently configured. Handy to roll back an experiment.
-  limits_sh_clear = local.limits_enable_live ? templatefile(
-    "${path.module}/templates/limits-clear.sh.tmpl",
-    {
-      vm_name = var.name
-    }
-  ) : ""
+  # Sidecar (.qv-limits/*.{ini,sh}) generation removed. Live-apply now lives
+  # in the standalone quick-throttle / quick-throttle-apply / quick-throttle-runner
+  # module triplet. quick-vm only retains the `enable_config` path (native
+  # libvirt XML injection via cputune/iotune/bandwidth attributes).
 }
 
 //-------------------------------------------------------------------------------
@@ -731,37 +700,5 @@ resource "libvirt_domain" "vm" {
     libvirt_volume.vm-disk-clone,
     libvirt_volume.cloudinit,
   ]
-}
-
-//-------------------------------------------------------------------------------
-// Sidecar limit files (enable_live)
-//-------------------------------------------------------------------------------
-
-resource "local_file" "limits_ini" {
-  count           = local.limits_ini != "" ? 1 : 0
-  filename        = "${path.root}/.qv-limits/qv-limits.spec.${var.name}.ini"
-  content         = local.limits_ini
-  file_permission = "0644"
-}
-
-resource "local_file" "limits_sh" {
-  count           = local.limits_sh != "" ? 1 : 0
-  filename        = "${path.root}/.qv-limits/qv-limits.apply.${var.name}.sh"
-  content         = local.limits_sh
-  file_permission = "0755"
-}
-
-resource "local_file" "limits_sh_clear" {
-  count           = local.limits_sh_clear != "" ? 1 : 0
-  filename        = "${path.root}/.qv-limits/qv-limits.clear.${var.name}.sh"
-  content         = local.limits_sh_clear
-  file_permission = "0755"
-}
-
-resource "local_file" "limits_gitignore" {
-  count           = (local.limits_ini != "" || local.limits_sh != "" || local.limits_sh_clear != "") ? 1 : 0
-  filename        = "${path.root}/.qv-limits/.gitignore"
-  content         = "*\n!.gitignore\n"
-  file_permission = "0644"
 }
 
