@@ -36,7 +36,7 @@ Each module is located in the [`modules`](../modules) directory:
 
 | Module | Description |
 |--------|-------------|
-| [`quick-vm`](../modules/quick-vm) | Provision a single VM with dynamic networks, OS profiles, and disk modes |
+| [`quick-vm`](../modules/quick-vm) | Provision a single VM with dynamic networks, OS profiles, and disk modes. Supports `vm_profile.{cpu,io,network}` + `enable_config` for KVM-API XML inject throttle (Path A). |
 | [`quick-vms`](../modules/quick-vms) | Provision multiple VMs as named sets sharing OS image and profile |
 | [`quick-os-volume`](../modules/quick-os-volume) | Create shared base OS volume for thin provisioning across VMs |
 | [`quick-networks`](../modules/quick-networks) | Create KVM virtual networks (NAT and bridge) |
@@ -44,6 +44,9 @@ Each module is located in the [`modules`](../modules) directory:
 | [`quick-access-ssh`](../modules/quick-access-ssh) | Render an `ssh-config` (one file per deployment) from `vms_info` groups |
 | [`quick-access-hosts`](../modules/quick-access-hosts) | Render an `/etc/hosts`-style file from `vms_info` groups |
 | [`quick-access-ansible`](../modules/quick-access-ansible) | Render an Ansible `inventory.ini` with groups + `[all:vars]` SSH/become config |
+| [`quick-throttle`](../modules/quick-throttle) | **Live-apply throttle (Path B, axis 1/3):** generate `.qv-limits/<prefix>-{cpu,disk,network}-<name>.ini` profile definitions from named collections per axis. |
+| [`quick-throttle-apply`](../modules/quick-throttle-apply) | **Live-apply throttle (Path B, axis 2/3):** generate `.qv-limits/<prefix>-throttle.ini` mapping file binding VMs to profiles (bootstrap all-null, edit manually). |
+| [`quick-throttle-runner`](../modules/quick-throttle-runner) | **Live-apply throttle (Path B, axis 3/3):** generate generic `.qv-limits/qv-throttle.{apply,clear}.sh` scripts that consume a mapping file and drive `virsh`. |
 
 ## Examples
 
@@ -58,5 +61,5 @@ The [`examples`](../examples) directory demonstrates how to use the modules:
 | [`example3c-vm`](../examples/example3c-vm) | OS image modes: shared os_volume, standalone os_name, custom os_profile |
 | [`example4-vms`](../examples/example4-vms) | Multiple VMs (masters + workers) with quick-vms |
 | [`example5-vms`](../examples/example5-vms) | Multiple quick-vms instances sharing one base volume, clone vs backing_store |
-| [`example6-vms`](../examples/example6-vms) | Resource limits — CPU & I/O throttling (`vm_profile.cpu.limit` / `io`), live apply via virsh |
+| [`example6-vms`](../examples/example6-vms) | Resource limits — demonstrates **both paths**: Path A (`enable_config` XML inject on single VM) and Path B (`quick-throttle*` triplet on a 3-node worker set with chaos workflow) |
 | [`example7-vms`](../examples/example7-vms) | Multiple quick-vms instances + standalone VM, with `quick-access-ssh`/`hosts`/`ansible` and group helpers |

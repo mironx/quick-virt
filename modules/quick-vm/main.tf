@@ -418,6 +418,20 @@ resource "libvirt_volume" "cloudinit" {
   }
 }
 
+# Extra writable disks (vdb, vdc, ...). Thin qcow2 volumes — empty
+# (no backing image). For_each keyed by target_dev for deterministic state.
+resource "libvirt_volume" "extra_disk" {
+  for_each = { for d in var.extra_disks : d.target_dev => d }
+  name     = "${var.name}-${each.value.target_dev}.qcow2"
+  pool     = coalesce(each.value.pool, local.storage_pool)
+  capacity = each.value.size_gb * 1024 * 1024 * 1024
+  target = {
+    format = {
+      type = "qcow2"
+    }
+  }
+}
+
 //-------------------------------------------------------------------------------
 // Network interfaces for libvirt domain
 //-------------------------------------------------------------------------------
@@ -531,7 +545,6 @@ locals {
   } : {}
 
   limits_enable_config = try(var.vm_profile.enable_config, true)
-  limits_enable_live   = try(var.vm_profile.enable_live, false)
 
   has_any_limit = local.cpu_limit_enabled || length(local.io_limits) > 0 || length(local.net_limits) > 0
 
@@ -544,57 +557,41 @@ locals {
   } : null
 
   # Per-disk io_tune — goes INSIDE disks[*] (supports baseline + burst natively
-  # on qcow2 files). For v1 we throttle only the main disk (target dev='vda').
-  _io_vda = try(local.io_limits["vda"], null)
-  native_io_tune_vda = local.limits_enable_config && local._io_vda != null ? {
-    read_bytes_sec             = local._io_vda.read_bytes_sec
-    write_bytes_sec            = local._io_vda.write_bytes_sec
-    read_iops_sec              = local._io_vda.read_iops_sec
-    write_iops_sec             = local._io_vda.write_iops_sec
-    read_bytes_sec_max         = local._io_vda.read_bytes_sec_max
-    read_bytes_sec_max_length  = local._io_vda.read_bytes_sec_max_length
-    write_bytes_sec_max        = local._io_vda.write_bytes_sec_max
-    write_bytes_sec_max_length = local._io_vda.write_bytes_sec_max_length
-    read_iops_sec_max          = local._io_vda.read_iops_sec_max
-    read_iops_sec_max_length   = local._io_vda.read_iops_sec_max_length
-    write_iops_sec_max         = local._io_vda.write_iops_sec_max
-    write_iops_sec_max_length  = local._io_vda.write_iops_sec_max_length
-  } : null
+  # on qcow2 files). Map keyed by target dev so multi-disk VMs (vda + vdb + ...)
+  # get throttle applied per device. Looked up via try(local.native_io_tunes[dev], null)
+  # in the disks list — disks without a matching io_limits entry get null (no throttle).
+  # dmacvicar/libvirt provider quirk: io_tune fields that user DIDN'T set
+  # must be OMITTED entirely (not sent as null and not sent as 0). Sending
+  # 0 causes "Provider produced inconsistent result" after libvirt reads
+  # back null. Sending null causes "argument must not be null". So we
+  # build io_tune with merge() including only fields that user set.
+  _io_tune_partial = local.limits_enable_config ? {
+    for dev, t in local.io_limits : dev => merge(
+      t.read_bytes_sec             == null ? {} : { read_bytes_sec             = t.read_bytes_sec },
+      t.write_bytes_sec            == null ? {} : { write_bytes_sec            = t.write_bytes_sec },
+      t.read_iops_sec              == null ? {} : { read_iops_sec              = t.read_iops_sec },
+      t.write_iops_sec             == null ? {} : { write_iops_sec             = t.write_iops_sec },
+      t.read_bytes_sec_max         == null ? {} : { read_bytes_sec_max         = t.read_bytes_sec_max },
+      t.read_bytes_sec_max_length  == null ? {} : { read_bytes_sec_max_length  = t.read_bytes_sec_max_length },
+      t.write_bytes_sec_max        == null ? {} : { write_bytes_sec_max        = t.write_bytes_sec_max },
+      t.write_bytes_sec_max_length == null ? {} : { write_bytes_sec_max_length = t.write_bytes_sec_max_length },
+      t.read_iops_sec_max          == null ? {} : { read_iops_sec_max          = t.read_iops_sec_max },
+      t.read_iops_sec_max_length   == null ? {} : { read_iops_sec_max_length   = t.read_iops_sec_max_length },
+      t.write_iops_sec_max         == null ? {} : { write_iops_sec_max         = t.write_iops_sec_max },
+      t.write_iops_sec_max_length  == null ? {} : { write_iops_sec_max_length  = t.write_iops_sec_max_length },
+    ) if t != null
+  } : {}
 
-  # ----------------------- Sidecar files (for enable_live = true) -----------------------
-  limits_ini = local.has_any_limit && local.limits_enable_live ? templatefile(
-    "${path.module}/templates/limits-spec.ini.tmpl",
-    {
-      vm_name            = var.name
-      vcpu               = var.vm_profile.vcpu
-      generated_at       = formatdate("YYYY-MM-DD'T'hh:mm:ss'Z'", timestamp())
-      quick_virt_version = "dev"
-      enable_config      = local.limits_enable_config
-      enable_live        = local.limits_enable_live
-      cpu_limit          = local.cpu_limit
-      io_limits          = local.io_limits
-      net_limits         = local.net_limits
-    }
-  ) : ""
+  # Filter out devs whose io_tune ended up empty (no user-set fields).
+  # Those don't need a libvirt <iotune> element at all.
+  native_io_tunes = {
+    for dev, obj in local._io_tune_partial : dev => obj if length(obj) > 0
+  }
 
-  limits_sh = local.has_any_limit && local.limits_enable_live ? templatefile(
-    "${path.module}/templates/limits-apply.sh.tmpl",
-    {
-      vm_name    = var.name
-      cpu_limit  = local.cpu_limit
-      io_limits  = local.io_limits
-      net_limits = local.net_limits
-    }
-  ) : ""
-
-  # Clear-all counterpart — emitted whenever enable_live is on, independent of
-  # whether limits are currently configured. Handy to roll back an experiment.
-  limits_sh_clear = local.limits_enable_live ? templatefile(
-    "${path.module}/templates/limits-clear.sh.tmpl",
-    {
-      vm_name = var.name
-    }
-  ) : ""
+  # Sidecar (.qv-limits/*.{ini,sh}) generation removed. Live-apply now lives
+  # in the standalone quick-throttle / quick-throttle-apply / quick-throttle-runner
+  # module triplet. quick-vm only retains the `enable_config` path (native
+  # libvirt XML injection via cputune/iotune/bandwidth attributes).
 }
 
 //-------------------------------------------------------------------------------
@@ -632,39 +629,65 @@ resource "libvirt_domain" "vm" {
   }
 
   devices = {
-    disks = [
-      {
-        source = {
-          volume = {
-            pool   = local.storage_pool
-            volume = local.vm_disk_name
+    disks = concat(
+      # Main writable disk (vda)
+      [
+        {
+          source = {
+            volume = {
+              pool   = local.storage_pool
+              volume = local.vm_disk_name
+            }
           }
-        }
-        target = {
-          dev = "vda"
-          bus = "virtio"
-        }
-        driver = {
-          name = "qemu"
-          type = "qcow2"
-        }
-        io_tune = local.native_io_tune_vda
-      },
-      {
-        source = {
-          volume = {
-            pool   = local.storage_pool
-            volume = libvirt_volume.cloudinit.name
+          target = {
+            dev = "vda"
+            bus = "virtio"
           }
+          driver = {
+            name = "qemu"
+            type = "qcow2"
+          }
+          io_tune = try(local.native_io_tunes["vda"], null)
         }
-        target = {
-          dev = "sda"
-          bus = "sata"
+      ],
+      # Extra writable disks (vdb, vdc, ...) — one per var.extra_disks entry
+      [
+        for d in var.extra_disks : {
+          source = {
+            volume = {
+              pool   = coalesce(d.pool, local.storage_pool)
+              volume = libvirt_volume.extra_disk[d.target_dev].name
+            }
+          }
+          target = {
+            dev = d.target_dev
+            bus = "virtio"
+          }
+          driver = {
+            name = "qemu"
+            type = "qcow2"
+          }
+          io_tune = try(local.native_io_tunes[d.target_dev], null)
         }
-        device    = "cdrom"
-        read_only = true
-      }
-    ]
+      ],
+      # Cloud-init ISO (read-only cdrom)
+      [
+        {
+          source = {
+            volume = {
+              pool   = local.storage_pool
+              volume = libvirt_volume.cloudinit.name
+            }
+          }
+          target = {
+            dev = "sda"
+            bus = "sata"
+          }
+          device    = "cdrom"
+          read_only = true
+        }
+      ]
+    )
 
     interfaces = [for i in local.vm_interfaces : i]
 
@@ -731,37 +754,5 @@ resource "libvirt_domain" "vm" {
     libvirt_volume.vm-disk-clone,
     libvirt_volume.cloudinit,
   ]
-}
-
-//-------------------------------------------------------------------------------
-// Sidecar limit files (enable_live)
-//-------------------------------------------------------------------------------
-
-resource "local_file" "limits_ini" {
-  count           = local.limits_ini != "" ? 1 : 0
-  filename        = "${path.root}/.qv-limits/qv-limits.spec.${var.name}.ini"
-  content         = local.limits_ini
-  file_permission = "0644"
-}
-
-resource "local_file" "limits_sh" {
-  count           = local.limits_sh != "" ? 1 : 0
-  filename        = "${path.root}/.qv-limits/qv-limits.apply.${var.name}.sh"
-  content         = local.limits_sh
-  file_permission = "0755"
-}
-
-resource "local_file" "limits_sh_clear" {
-  count           = local.limits_sh_clear != "" ? 1 : 0
-  filename        = "${path.root}/.qv-limits/qv-limits.clear.${var.name}.sh"
-  content         = local.limits_sh_clear
-  file_permission = "0755"
-}
-
-resource "local_file" "limits_gitignore" {
-  count           = (local.limits_ini != "" || local.limits_sh != "" || local.limits_sh_clear != "") ? 1 : 0
-  filename        = "${path.root}/.qv-limits/.gitignore"
-  content         = "*\n!.gitignore\n"
-  file_permission = "0644"
 }
 
