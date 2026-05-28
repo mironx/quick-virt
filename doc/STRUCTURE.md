@@ -24,7 +24,7 @@ quick-virt/
 │   ├── example3d-vm/             # Single VM extras
 │   ├── example4-vms/             # Multi-VM cluster setup (masters + workers)
 │   ├── example5-vms/             # Multiple quick-vms sharing one base volume
-│   ├── example6-vms/             # Resource limits (CPU & I/O throttling)
+│   ├── example6-vms/             # Resource limits — two paths (enable_config XML inject + quick-throttle* triplet)
 │   └── example7-vms/             # Cluster + access helpers (ssh / hosts / ansible)
 ├── scripts/                      # Helper shell scripts
 │   ├── setup/                    # System setup scripts
@@ -40,7 +40,7 @@ Two directories appear under your Terraform project root (`path.root`) after `te
 | Directory | Created by | What it holds |
 |-----------|------------|---------------|
 | `.qv-access/` | `quick-access-ssh` / `quick-access-hosts` / `quick-access-ansible` | `ssh-config`, `hosts`, `inventory.ini` — fed by `vms_info` groups |
-| `.qv-limits/` | `quick-vm` / `quick-vms` when `vm_profile.enable_live = true` | `qv-limits.spec.<vm>.ini` (editable runtime spec), `qv-limits.apply.<vm>.sh`, `qv-limits.clear.<vm>.sh`, set-level `apply-all` / `clear-all` scripts |
+| `.qv-limits/` | `quick-throttle` / `quick-throttle-apply` / `quick-throttle-runner` | `<prefix>-{cpu,disk,network}-<name>.ini` profiles, `<prefix>-throttle.ini` mapping, generic `qv-throttle.{apply,clear}.sh` runner scripts |
 
 Both directories ship their own `.gitignore` (`*`), so generated content stays out of version control.
 

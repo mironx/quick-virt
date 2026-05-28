@@ -142,7 +142,7 @@ Provisions one KVM domain with cloud-init, dynamic networks, shared folders, and
 | Name | Type | Required | Default | Description |
 |------|------|:---:|---------|-------------|
 | `name` | `string` | yes | — | VM name |
-| `vm_profile` | `object({ vcpu, memory, cpu, io, enable_config, enable_live })` | yes | — | Compute profile + optional CPU/I/O throttling — see [Resource limits](#resource-limits--cpu-io--network-throttling) |
+| `vm_profile` | `object({ vcpu, memory, cpu, io, network, enable_config })` | yes | — | Compute profile + optional CPU/I/O/network throttling via XML inject (Path A — see [Resource limits](#resource-limits--cpu-io--network-throttling)) |
 | `user_data` | `string` | yes | — | Rendered cloud-init `#cloud-config` |
 | `networks` | `list(object)` | no | `[]` | Attached networks (order = interface order) |
 | `kvm-networks` | `map(object)` | no | `{}` | Global enable/disable + optional manual profile override |
@@ -893,7 +893,20 @@ Turn `shared = false` only when you're sure you don't use shared folders **and**
 
 ### Resource limits — CPU, I/O & network throttling
 
-Cap how much CPU time and disk I/O a VM can consume — independent from the `vcpu`/`memory` allocation. Useful for reproducing cloud-like resource contention on a dev box, stress-testing apps under slow I/O, or just preventing one noisy VM from starving the host.
+Cap how much CPU time, disk I/O and network bandwidth a VM can consume — independent from the `vcpu`/`memory` allocation. Useful for reproducing cloud-like resource contention on a dev box, stress-testing apps under slow I/O, or chaos engineering.
+
+Quick-virt provides **two paths** for throttling, with different trade-offs:
+
+| Path | Mechanism | When to use |
+|---|---|---|
+| **A — `enable_config` XML inject** | Values live in `vm_profile.{cpu,io,network}` and are baked into the libvirt domain XML at `terraform apply`. | Persistent baseline throttle known at terraform-time. Lightweight: no extra modules. |
+| **B — `quick-throttle*` triplet** | Three standalone modules emit `.qv-limits/*.ini` definitions + apply/clear scripts that drive `virsh` for live changes. | Chaos sessions, hot tweak without re-running `terraform apply`, IO/network burst, multi-scenario mappings. |
+
+Both paths use the same underlying libvirt mechanisms (cgroups via `cputune` / `iotune`, traffic shaping via `<bandwidth>`). They can coexist on the same set of VMs — Path A handles VMs that should always run with a fixed throttle, Path B handles ad-hoc experimentation on top.
+
+See [`examples/example6-vms`](../examples/example6-vms) for a working side-by-side example (baseline VM + Path A throttled VM + Path B 3-node worker set).
+
+#### Path A — `enable_config` XML inject (lightweight, terraform-driven)
 
 ```hcl
 vm_profile = {
@@ -902,31 +915,122 @@ vm_profile = {
 
   cpu = {
     limit = {
-      percent = 25        # 25 % of total allocated CPU capacity (~1 core of 4)
+      percent = 25        # 25 % of total allocated CPU (~ 1 core of 4)
     }
   }
 
   io = {
     vda = {
-      bytes_unit = "MB"    # interpret *_bytes_sec fields as MB/s
-
-      read_bytes_sec  = 10       #  10 MB/s baseline
-      write_bytes_sec =  5       #   5 MB/s baseline
+      bytes_unit      = "MB"
+      read_bytes_sec  = 10
+      write_bytes_sec = 5
       read_iops_sec   = 1000
       write_iops_sec  = 500
-
-      # burst — short spike above baseline
-      write_bytes_sec_max        = 20    # peak 20 MB/s
-      write_bytes_sec_max_length = 5     # for 5 seconds
     }
   }
 
-  enable_config = true    # bake limits into libvirt domain XML (persistent)
-  enable_live   = true    # also write sidecar .ini + .sh for live apply via virsh
+  network = {
+    "0" = {
+      rate_unit = "MB"
+      inbound  = { average = 10, peak = 50, burst = 1 }
+      outbound = { average = 5,  peak = 20, burst = 1 }
+    }
+  }
+
+  enable_config = true    # default — bake limits into libvirt domain XML
 }
 ```
 
-See [`examples/example6-vms`](../examples/example6-vms) for a working side-by-side comparison (loose baseline VM + throttled VM + 3-node worker set).
+After `terraform apply`, limits are visible immediately in the domain XML and at the runtime cgroup level:
+
+```bash
+virsh dumpxml <vm> | grep -E "cputune|iotune|<bandwidth"
+virsh schedinfo <vm>
+virsh blkdeviotune <vm> vda
+virsh domiftune <vm> <vnet-name>
+```
+
+**Limitations of Path A:**
+- I/O burst attributes (`*_max`, `*_max_length`) may be rejected by the dmacvicar provider's iotune schema — for burst, use Path B.
+- Value changes require `terraform apply`. No hot tweak via `.ini` editing.
+- Network bandwidth IS supported on `vm_profile.network.<idx>` and goes into the interface's `<bandwidth>` element.
+
+#### Path B — `quick-throttle*` triplet (sidecar live-apply workflow)
+
+Three composable modules:
+
+| Module | Produces |
+|---|---|
+| [`quick-throttle`](../modules/quick-throttle/) | `.qv-limits/<prefix>-{cpu,disk,network}-<name>.ini` — named throttle profiles per axis |
+| [`quick-throttle-apply`](../modules/quick-throttle-apply/) | `.qv-limits/<prefix>-throttle.ini` — VM ↔ profile mapping, all-null bootstrap with an auto-discovery comment header |
+| [`quick-throttle-runner`](../modules/quick-throttle-runner/) | `.qv-limits/qv-throttle.{apply,clear}.sh` — generic consumer scripts that take a mapping file as argument |
+
+```hcl
+module "throttle" {
+  source     = "git@github.com:mironx/quick-virt.git//modules/quick-throttle?ref=vX.Y.Z"
+  output_dir = path.root
+  prefix     = "lab"
+
+  cpu_configs = {
+    cap25 = { limit = { percent = 25 } }
+  }
+  disk_configs = {
+    slow = {
+      vda = {
+        bytes_unit      = "MB"
+        read_bytes_sec  = 10
+        write_bytes_sec = 5
+        # burst — Path B can apply these via virsh
+        write_bytes_sec_max        = 20
+        write_bytes_sec_max_length = 5
+      }
+    }
+  }
+  network_configs = {
+    bandit = { "0" = { rate_unit = "MB", inbound = { average = 10 }, outbound = { average = 5 } } }
+  }
+}
+
+module "throttle_apply" {
+  source             = "git@github.com:mironx/quick-virt.git//modules/quick-throttle-apply?ref=vX.Y.Z"
+  output_dir         = path.root
+  prefix             = "lab"
+  vms                = [module.vm1.vm_info, module.vm2.vm_info]
+  available_profiles = module.throttle.available_files   # populates header comment
+}
+
+module "throttle_runner" {
+  source     = "git@github.com:mironx/quick-virt.git//modules/quick-throttle-runner?ref=vX.Y.Z"
+  output_dir = path.root
+}
+```
+
+After `terraform apply`:
+
+```bash
+# Generated artefacts in .qv-limits/
+ls .qv-limits/
+# → lab-cpu-cap25.ini    lab-disk-slow.ini    lab-network-bandit.ini
+#   lab-throttle.ini     qv-throttle.apply.sh    qv-throttle.clear.sh
+
+# Edit the mapping file — assign profile filenames to specific VMs
+$EDITOR .qv-limits/lab-throttle.ini
+# Change `cpu_profile = null` to `cpu_profile = lab-cpu-cap25.ini`, etc.
+
+# Apply via virsh — runtime effect immediate (cpu/disk also --config; network is --live only)
+bash .qv-limits/qv-throttle.apply.sh .qv-limits/lab-throttle.ini
+
+# Iterate: edit profile values or mapping, re-run apply.sh — no terraform apply needed
+$EDITOR .qv-limits/lab-cpu-cap25.ini
+bash .qv-limits/qv-throttle.apply.sh .qv-limits/lab-throttle.ini
+
+# Clear all throttles for VMs listed in the mapping
+bash .qv-limits/qv-throttle.clear.sh .qv-limits/lab-throttle.ini
+```
+
+**Multi-scenario isolation** — instantiate multiple `quick-throttle` / `quick-throttle-apply` triplets with different `prefix` values. Each gets its own family of files in `.qv-limits/`; one shared `qv-throttle.apply.sh` (from `quick-throttle-runner`) consumes any mapping file by filename.
+
+**Format version** — the mapping file carries `format_version` in its `[meta]` section; `apply.sh` validates and aborts on mismatch (defensive guard when bumping module versions).
 
 #### CPU limit (`cpu.limit`)
 
@@ -940,34 +1044,15 @@ See [`examples/example6-vms`](../examples/example6-vms) for a working side-by-si
 Formula: `quota_us = vcpu × period_us × percent / 100`.
 Example: `vcpu=4, percent=25, period_us=100000` → `quota_us=100000` (= 1 core-equivalent).
 
-**INI as the runtime source of truth (`enable_live = true`):**
+**Mode resolution (used by Path B's `qv-throttle.apply.sh` when consuming a `cpu-<name>.ini` profile):**
 
-The sidecar `qv-limits.spec.<vm>.ini` file is re-read by `qv-limits.apply.<vm>.sh` at every invocation. The `[cpu]` section has three possible fields; the script picks a mode based on what's uncommented:
+| In the profile `.ini` | Mode | Effective values |
+|---|:---:|---|
+| `percent` set, raw fields commented | **PERCENT** | `quota_us = vcpu × period_us × percent / 100` (vcpu queried via `virsh dominfo`, period defaults to `100000`) |
+| both `period_us` AND `quota_us` set | **RAW** | values used verbatim, `percent` ignored |
+| neither set | **SKIP** | CPU section is a no-op |
 
-```ini
-[cpu]
-vcpu      = 2              ← always active, needed for percent → quota math
-percent   = 25             ← active by default when you set cpu.limit.percent
-# period_us = 100000       ← uncomment BOTH to force RAW mode
-# quota_us  = 50000        ← uncomment BOTH to force RAW mode
-# shares    =              ← optional relative weight
-```
-
-| INI state | Mode | What `.sh` does |
-|-----------|:---:|---|
-| `percent` active, `period_us` + `quota_us` commented | **PERCENT** | `quota_us = vcpu × period_us × percent / 100`, falls back to `period_us = 100000` if also commented |
-| `period_us` AND `quota_us` both uncommented | **RAW** | Uses values verbatim, ignores `percent` |
-| Nothing uncommented | **SKIP** | CPU section no-op |
-
-The script logs its decision:
-
-```
-[cpu] mode=PERCENT 25% × 2 vcpu × 100000us → quota=50000us
-[cpu] mode=RAW     period=100000us quota=99000us (from .ini)
-[cpu] mode=SKIP    (no percent / raw values in .ini)
-```
-
-**Implication:** edit the `.ini` and re-run `bash qv-limits.apply.<vm>.sh` to change live CPU limits without touching Terraform. (Keep in mind: the next `terraform apply` regenerates the `.ini` from `vm_profile` — persistent changes still belong in HCL.)
+For Path A, only `percent` or explicit `period_us` + `quota_us` are baked into the XML at terraform-time (vcpu is known statically from `vm_profile.vcpu`).
 
 **Verify after apply:**
 ```bash
@@ -1106,55 +1191,23 @@ vm_profile = {
 
 > **Libvirt's base unit is KiB/s** for rates and **KiB** for burst (binary kilobytes). The module converts from user-friendly `rate_unit` to KiB before passing to libvirt.
 
-**Live apply** uses `virsh domiftune` (per-interface, by target dev name which the script resolves from `virsh domiflist`):
+**Live apply (Path B)** uses `virsh domiftune` (per-interface, by target dev name which the runner script resolves from `virsh domiflist`):
 
 ```bash
 virsh domiftune <vm> vnet0 \
   --inbound  "10240,51200,1024,0" \    # avg,peak,burst,floor
   --outbound "5120,20480,1024" \
-  --live --config
+  --live
 ```
+
+> Network throttle is **live-only** in Path B — `--config` is omitted because the inactive XML (which `--config` writes to) doesn't contain the `<target dev='vnetN'/>` runtime alias. Result: network throttle does not survive VM reboot. CPU and disk axes ARE persisted via `--config`.
 
 Clear mode zeroes every attached NIC (no-op on NICs that were never throttled).
 
-#### Apply flags
+#### Apply flag — `enable_config`
 
 | Flag | Default | Effect |
 |------|---------|--------|
-| `enable_config` | `true` | Inject limits into libvirt domain XML via native `cpu_tune` and `disks[*].io_tune`. Persistent — survives VM restart. |
-| `enable_live` | `false` | Also emit three sidecar files in `./.qv-limits/`: <br>• `qv-limits.spec.<vm>.ini` — spec file, **runtime source of truth for `[cpu]`** (see [CPU limit](#cpu-limit-cpulimit) — the apply script reads it every invocation)<br>• `qv-limits.apply.<vm>.sh` — apply all configured limits live via `virsh schedinfo` + `virsh blkdeviotune` + `virsh domiftune`<br>• `qv-limits.clear.<vm>.sh` — **remove every** CPU/IO/network limit in one shot |
+| `enable_config` | `true` | Inject `vm_profile.{cpu,io,network}` values into the libvirt domain XML via native `cpu_tune`, `disks[*].io_tune`, and per-interface `<bandwidth>`. Persistent — survives VM restart. |
 
-Both flags are independent — you can bake-only, live-only, both, or neither.
-
-**Verifying after apply:**
-
-```bash
-virsh schedinfo <vm-name>                # CPU
-virsh blkdeviotune <vm-name> vda         # I/O (baseline + burst)
-
-# Live re-apply without reboot:
-bash ./.qv-limits/qv-limits.apply.<vm-name>.sh
-
-# Clear all CPU & IO limits on a running VM (rollback / benchmark baseline):
-bash ./.qv-limits/qv-limits.clear.<vm-name>.sh
-```
-
-**Set-level scripts (quick-vms only):**
-
-When a machine set uses `enable_live = true`, `quick-vms` also emits aggregate scripts that fan-out over every node:
-
-```
-./.qv-limits/
-├── qv-limits.apply-all.<set-name>.sh    # bash-loop — applies limits to every node
-└── qv-limits.clear-all.<set-name>.sh    # bash-loop — clears limits on every node
-```
-
-Each script re-uses the per-VM `qv-limits.apply.<vm>.sh` / `qv-limits.clear.<vm>.sh` scripts emitted by `quick-vm`; missing per-VM scripts are skipped with a warning.
-
-```bash
-# One command to throttle the whole 'workers' set:
-bash ./.qv-limits/qv-limits.apply-all.qvms-ex6-worker.sh
-
-# And one to release:
-bash ./.qv-limits/qv-limits.clear-all.qvms-ex6-worker.sh
-```
+For the live-apply path (sidecar `.ini` + `qv-throttle.{apply,clear}.sh`), see the [`quick-throttle*` triplet](#path-b--quick-throttle-triplet-sidecar-live-apply-workflow) above.

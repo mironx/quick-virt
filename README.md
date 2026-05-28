@@ -16,7 +16,7 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fi
 - Shared base volumes via `quick-os-volume` — one download, many thin VMs.
 - SSH, hosts, and Ansible inventory generation via `quick-access-*` (emitted to `.qv-access/`).
 - Graceful validation with actionable error messages.
-- Per-VM resource limits — CPU, I/O & network throttling via libvirt domain XML and live-apply scripts (`.qv-limits/`).
+- Per-VM resource limits — CPU, I/O & network throttling. Two paths: native libvirt XML inject (`vm_profile.{cpu,io,network}` + `enable_config`) and a live-apply triplet (`quick-throttle` / `-apply` / `-runner`) that emits `.qv-limits/*` and drives `virsh`.
 - Task runner (`Taskfile`) for common operations including OS image management.
 - Includes helper scripts for system setup and recovery.
 

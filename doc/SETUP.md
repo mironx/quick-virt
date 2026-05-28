@@ -123,30 +123,34 @@ Useful helpers once networks exist:
 | 3 | `task scaffold:init-cloud-config DIR=./templates` | Creates a cloud-init `user-data` template with your SSH key | Once per new example — bootstraps the cloud-init template. |
 | 4 | `task scaffold:init-networks DIR=./my-networks` | Scaffolds a Terraform project for KVM networks (pinned to installed version) | Once per environment — see step 3 of this guide. |
 
-### 7. Resource limits — live apply
+### 7. Resource limits — two paths
 
-When `vm_profile.enable_live = true` is set on a `quick-vm` or `quick-vms` set, `terraform apply` emits sidecar scripts under your project's `.qv-limits/` directory. These let you re-apply CPU / I/O / network throttling **without rebooting the VM** — the apply script reads `qv-limits.spec.<vm>.ini` (a hand-editable INI) and runs `virsh schedinfo` / `virsh blkdeviotune` / `virsh domiftune --live --config`.
+Quick-virt offers two independent throttle paths:
 
-| File | Purpose |
-|------|---------|
-| `qv-limits.spec.<vm>.ini` | Runtime spec — edit `[cpu]` mode (PERCENT/RAW), tweak IO/burst values, re-run `apply` |
-| `qv-limits.apply.<vm>.sh` | Apply all limits to one VM live |
-| `qv-limits.clear.<vm>.sh` | Clear every limit on one VM live |
-| `qv-limits.apply-all.<set>.sh` | Apply to every node in a `quick-vms` set |
-| `qv-limits.clear-all.<set>.sh` | Clear on every node in a set |
+**Path A — XML inject (`enable_config`, default ON in `quick-vm` / `quick-vms`):**
+Put `cpu` / `io` / `network` into `vm_profile`; on `terraform apply`, values are baked into the libvirt domain XML (`cputune`, `iotune`, `<bandwidth>`). Persistent across reboot. No sidecar scripts. Inspect via `virsh dumpxml <vm>` or `virsh schedinfo` / `virsh blkdeviotune` / `virsh domiftune`.
+
+**Path B — live-apply via `quick-throttle*` triplet:**
+Three standalone modules (`quick-throttle`, `quick-throttle-apply`, `quick-throttle-runner`) emit sidecar files under `.qv-limits/`. Workflow: edit the mapping file → run `qv-throttle.apply.sh`. Supports hot tweak without re-running `terraform apply`, IO/network burst (via virsh), multi-scenario isolation by `prefix`.
+
+| File (Path B) | Purpose |
+|---|---|
+| `<prefix>-{cpu,disk,network}-<name>.ini` | Named throttle profile per axis |
+| `<prefix>-throttle.ini` | VM ↔ profile mapping (all-null bootstrap, edit manually) |
+| `qv-throttle.apply.sh` | Generic — apply throttles from any mapping file: `bash qv-throttle.apply.sh <prefix>-throttle.ini` |
+| `qv-throttle.clear.sh` | Generic — clear throttles for VMs listed in mapping |
 
 ```bash
-# Run from your project directory (where .qv-limits/ lives):
-bash .qv-limits/qv-limits.apply.<vm-name>.sh
-bash .qv-limits/qv-limits.clear.<vm-name>.sh
-
-# Whole 'workers' set at once:
-bash .qv-limits/qv-limits.apply-all.<set-name>.sh
+# Path B example (assumes module triplet instantiated in your project):
+ls .qv-limits/
+$EDITOR .qv-limits/<prefix>-throttle.ini    # assign profile filenames per VM/axis
+bash .qv-limits/qv-throttle.apply.sh .qv-limits/<prefix>-throttle.ini
+bash .qv-limits/qv-throttle.clear.sh .qv-limits/<prefix>-throttle.ini
 ```
 
-> Each `terraform apply` **regenerates** the `.ini` from `vm_profile`. If you tweak it for live testing and want the change to survive, fold it back into your HCL.
+> Each `terraform apply` regenerates mapping `[meta]` + sections from the `vms` input — manual profile assignments survive as long as the `vms` set is unchanged. Profile `.ini` values come from HCL too.
 
-Full input schema (`vm_profile.cpu.limit`, `vm_profile.io.<dev>`, `vm_profile.network.<idx>`) — see [`doc/USAGE.md` → Resource limits](./USAGE.md#resource-limits--cpu-io--network-throttling).
+Full input schema (Path A `vm_profile.cpu.limit` / `io.<dev>` / `network.<idx>`, Path B `quick-throttle` inputs) — see [`doc/USAGE.md` → Resource limits](./USAGE.md#resource-limits--cpu-io--network-throttling) and per-module READMEs in [`modules/quick-throttle*`](../modules/).
 
 ## Scripts
 
