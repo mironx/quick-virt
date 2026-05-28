@@ -133,10 +133,10 @@ resource "null_resource" "validate_resource_limits" {
       condition = alltrue([
         for dev, t in coalesce(try(var.vm_profile.io, null), {}) :
         alltrue([
-          try(t.read_bytes_sec, 0) >= 0,
-          try(t.write_bytes_sec, 0) >= 0,
-          try(t.read_iops_sec, 0) >= 0,
-          try(t.write_iops_sec, 0) >= 0,
+          coalesce(try(t.read_bytes_sec, 0), 0) >= 0,
+          coalesce(try(t.write_bytes_sec, 0), 0) >= 0,
+          coalesce(try(t.read_iops_sec, 0), 0) >= 0,
+          coalesce(try(t.write_iops_sec, 0), 0) >= 0,
         ])
       ])
       error_message = "vm_profile.io.<dev>.* values must be >= 0 (0 = unlimited) [vm_name:${var.name}]"

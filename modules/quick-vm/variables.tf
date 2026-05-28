@@ -62,6 +62,44 @@ variable "main_storage" {
   default = null
 }
 
+variable "extra_disks" {
+  description = <<-EOT
+    Additional writable disks beyond the main vda. Each is a thin qcow2
+    volume in the storage pool. Use this to add data disks (vdb, vdc, ...)
+    for workloads that benefit from separate disks per role (DB data on
+    vdb, WAL on vdc, etc.).
+
+    Per-disk throttling (`vm_profile.io.<dev>`) targets each entry by its
+    target_dev — vdb config goes to vdb's XML <iotune>, etc.
+  EOT
+  type = list(object({
+    target_dev = string                      # e.g. vdb, vdc — must NOT be vda (reserved for main)
+    size_gb    = number                      # disk size in GiB
+    pool       = optional(string)            # storage pool; defaults to module's storage_pool
+  }))
+  default = []
+
+  validation {
+    condition = alltrue([
+      for d in var.extra_disks :
+      can(regex("^vd[b-z]$", d.target_dev))
+    ])
+    error_message = "extra_disks[*].target_dev must match /^vd[b-z]$/ (e.g. vdb, vdc). 'vda' is reserved for the main disk."
+  }
+
+  validation {
+    condition     = length(var.extra_disks) == length(distinct([for d in var.extra_disks : d.target_dev]))
+    error_message = "extra_disks[*].target_dev must be unique (no two extra disks with the same target)."
+  }
+
+  validation {
+    condition = alltrue([
+      for d in var.extra_disks : d.size_gb > 0
+    ])
+    error_message = "extra_disks[*].size_gb must be > 0."
+  }
+}
+
 variable "vm_profile" {
   type = object({
     vcpu   = number

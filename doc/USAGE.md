@@ -157,7 +157,8 @@ Provisions one KVM domain with cloud-init, dynamic networks, shared folders, and
 | `run_before` | `list(string)` | no | `[]` | Commands run very early (after hostname) |
 | `run_after` | `list(string)` | no | `[]` | Commands run after shared folders mount |
 | `user_data_after` | `string` | no | `null` | Extra `#cloud-config` appended after shared folders |
-| `main_storage` | `object({ size })` | no | `null` | Main disk size in GiB |
+| `main_storage` | `object({ size })` | no | `null` | Main disk (vda) size in GiB |
+| `extra_disks` | `list(object({ target_dev, size_gb, pool? }))` | no | `[]` | Additional writable disks (vdb, vdc, ...). See [Extra writable disks](#extra-writable-disks-extra_disks) |
 | `memory_backing` | `object` | no | `{}` | See [Memory backing](#memory-backing) |
 | `running` / `autostart` | `bool` | no | `true` / `false` | Power state & host-boot autostart |
 
@@ -588,6 +589,44 @@ See [`examples/example3c-vm`](../examples/example3c-vm) (VMs A/B/C) and [`exampl
 
 - `os_volume + os_disk_mode = "clone"` is **blocked by validation** (libvirt 0.9.x file-permission limitation on root:root 600 files in the default pool).
 - Use `clone` with `os_name` or `os_profile` instead (see `examples/example5-vms` → `vms_C` / `vms_D`).
+
+---
+
+### Extra writable disks (`extra_disks`)
+
+Add data disks beyond the main `vda` (e.g. DB data on `vdb`, WAL on `vdc`). Each entry creates a thin qcow2 volume in the same (or specified) pool. Per-disk throttling via `vm_profile.io.<dev>` works for these too — see [Resource limits](#resource-limits--cpu-io--network-throttling).
+
+```hcl
+module "vm" {
+  source = "..."
+  ...
+  extra_disks = [
+    { target_dev = "vdb", size_gb = 50 },
+    { target_dev = "vdc", size_gb = 100, pool = "fast-nvme" },
+  ]
+
+  vm_profile = {
+    vcpu = 2, memory = 4096
+    io = {
+      vda = { bytes_unit = "MB", read_bytes_sec = 100 }   # OS disk fast
+      vdb = { bytes_unit = "MB", read_bytes_sec = 50, write_bytes_sec = 30 }   # data
+      vdc = { read_iops_sec = 200, write_iops_sec = 100 } # WAL — IOPS only
+    }
+    enable_config = true
+  }
+}
+```
+
+**Validation enforced:**
+- `target_dev` must match `/^vd[b-z]$/` — `vda` is reserved for main disk
+- `target_dev` must be unique across `extra_disks`
+- `size_gb > 0`
+
+**Discovery:** `module.vm.vm_info.disks` returns `["vda", "vdb", "vdc"]` (all writable disks). Pass this to `quick-throttle-apply` so the generated mapping file has `disk_profile.vdb` / `disk_profile.vdc` lines per extra disk.
+
+**Notes:**
+- Disks are EMPTY at boot (no filesystem) — partition/format inside the VM via `runcmd` in cloud-init or post-boot script.
+- Volumes are deleted on `terraform destroy` (data is NOT preserved). For persistent data, use a host-side directory + NFS / virtiofs instead.
 
 ---
 
@@ -1220,7 +1259,7 @@ Things that **don't error** at `terraform apply` or `apply.sh` but quietly produ
 
 | Field / scenario | Symptom | Reason |
 |---|---|---|
-| `vm_profile.io.vdb` (or any non-vda) with `enable_config = true` | Throttle silently ignored | Path A only wires `disks[0]` (vda) into `<iotune>`. Multi-disk support is Path B territory (`disk_configs[name] = map(dev → throttle)`). Tracked: [`to-improve-limits.md` #5](./to-improve-limits.md). |
+| `vm_profile.io.<dev>` for a disk NOT declared in `extra_disks` (Path A) | XML iotune written for non-existent disk → libvirt may warn | Path A iterates over `var.extra_disks` for writable disks; throttle config for `vdz` if `vdz` isn't in `extra_disks` produces an iotune block for a missing target. Declare the disk in `extra_disks = [{ target_dev = "vdz", size_gb = N }]` first. |
 | `network.<idx>.outbound.floor` on a bridge / non-QoS network | No error, no effect | `<bandwidth><outbound floor>` is only honored on NAT networks with QoS enabled. Bridge mode bypasses libvirt's QoS layer. Use `inbound`+`outbound` `average`/`peak`/`burst` instead. |
 | IO `*_max` (burst) attrs with `enable_config = true` | May be rejected by provider | dmacvicar/libvirt 0.9.x iotune schema may not accept all burst attributes. If you need burst, use Path B (`quick-throttle` profile + `qv-throttle.apply.sh`) where they're applied via `virsh blkdeviotune`. |
 | Network throttle (Path B) survives VM reboot | No — only `--live` is applied | `apply.sh` omits `--config` for `domiftune` because the inactive XML lacks `<target dev='vnetN'/>` (runtime alias). CPU and disk axes DO persist via `--config`. |
