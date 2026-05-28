@@ -63,7 +63,7 @@ output "vm_shared_folders" {
 }
 
 output "vm_info" {
-  description = "Consolidated VM info — consumable by aggregator modules (e.g. quick-access)"
+  description = "Consolidated VM info — consumable by aggregator modules (e.g. quick-access, quick-throttle-apply)"
   value = {
     name = libvirt_domain.vm.name
     id   = libvirt_domain.vm.id
@@ -79,6 +79,10 @@ output "vm_info" {
         kvm_network_name = try(n.profile.kvm_network_name, n.profile_name)
       }
     ]
+    # Writable disks (cloudinit cdrom excluded). quick-vm currently produces
+    # exactly one writable disk targeted as 'vda'. Future multi-disk support
+    # would extend this list.
+    disks = ["vda"]
     os_profile = {
       os_name          = coalesce(var.os_name, "ubuntu_22")
       image            = local.selected_os.image
