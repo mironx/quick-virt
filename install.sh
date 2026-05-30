@@ -88,6 +88,18 @@ echo "$QV_VERSION" > "$PREFIX/.version"
 
 cat > "$BIN_DIR/quick-virt" <<EOF
 #!/bin/bash
+if ! command -v task >/dev/null 2>&1; then
+    echo "[error] 'task' runner is not installed — quick-virt needs it to run." >&2
+    echo "        Install Task from: https://taskfile.dev/installation/" >&2
+    exit 1
+fi
+# Best-effort update notice: 'compare' is offline & instant; 'refresh' updates the
+# cache in the background for next time. Skipped for self:* and when QV_NO_UPDATE_CHECK is set.
+check="$PREFIX/scripts/tools/check-update.sh"
+if [ -z "\${QV_NO_UPDATE_CHECK:-}" ] && [ -f "\$check" ] && [[ "\${1:-}" != self:* ]]; then
+    bash "\$check" compare || true
+    bash "\$check" refresh >/dev/null 2>&1 &
+fi
 exec task -t "$PREFIX/Taskfile.yml" "\$@"
 EOF
 chmod +x "$BIN_DIR/quick-virt"
