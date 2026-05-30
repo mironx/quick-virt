@@ -5,6 +5,20 @@ vars:
 
 tasks:
   # ---------------------------------------------------------------------------
+  # Help — grouped quick reference (shown for bare `quick-virt` / `task`)
+  # ---------------------------------------------------------------------------
+  default:
+    desc: Show grouped help with examples
+    silent: true
+    cmds:
+      - task: help
+
+  help:
+    desc: Grouped quick reference with examples (more readable than --list)
+    silent: true
+    cmd: bash "{{.TASKFILE_DIR}}/scripts/tools/help.sh"
+
+  # ---------------------------------------------------------------------------
   # Self-management (for users who installed via install.sh)
   # ---------------------------------------------------------------------------
   self:version:
@@ -32,15 +46,21 @@ tasks:
         echo "version  : unknown (running from a cloned repo, not an install)"
       fi
 
+  self:check-update:
+    desc: Check GitHub for a newer quick-virt version and report installed vs latest
+    cmd: bash "{{.TASKFILE_DIR}}/scripts/tools/check-update.sh" status
+
   self:update:
     desc: Re-install the latest tag (or override with QV_VERSION=<tag>)
     cmd: curl -fsSL https://raw.githubusercontent.com/mironx/quick-virt/main/install.sh | bash
 
   self:uninstall:
-    desc: Remove the quick-virt installation (~/.local/share/quick-virt and ~/.local/bin/quick-virt)
+    desc: Remove the quick-virt installation (prefix from this Taskfile + the quick-virt wrapper)
     cmd: |
-      rm -rf "$HOME/.local/share/quick-virt" "$HOME/.local/bin/quick-virt"
-      echo "[ok] quick-virt uninstalled"
+      prefix="{{.TASKFILE_DIR}}"
+      bin="$(command -v quick-virt 2>/dev/null || echo "$HOME/.local/bin/quick-virt")"
+      rm -rf "$prefix" "$bin"
+      echo "[ok] quick-virt uninstalled (removed $prefix and $bin)"
 
   # ---------------------------------------------------------------------------
   # Setup
@@ -106,8 +126,10 @@ tasks:
       vars: [PHYS_IF, BRIDGE_NAME]
 
   bridge:restore:
-    desc: Restore network after bridge removal
-    cmd: sudo {{.SCRIPTS_DIR}}/linux-bridge/restore-network.sh
+    desc: Restore network after bridge removal (requires PHYS_IF and BRIDGE_NAME)
+    cmd: sudo {{.SCRIPTS_DIR}}/linux-bridge/restore-network.sh --phys-if {{.PHYS_IF}} --bridge-name {{.BRIDGE_NAME}}
+    requires:
+      vars: [PHYS_IF, BRIDGE_NAME]
 
   # ---------------------------------------------------------------------------
   # Tools
@@ -191,4 +213,4 @@ tasks:
 
   net:test:
     desc: Run tests for kvm-net-info.sh
-    cmd: ./modules/quick-kvm-network-reader/scripts/test-kvm-net-info.sh
+    cmd: '{{.SCRIPTS_DIR}}/../modules/quick-kvm-network-reader/scripts/test-kvm-net-info.sh'

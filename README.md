@@ -45,12 +45,33 @@ The installer places:
 | `~/.local/share/quick-virt/` | `Taskfile.yml` + `scripts/` + `modules/quick-kvm-network-reader/scripts/` |
 | `~/.local/bin/quick-virt` | Wrapper that runs `task -t ~/.local/share/quick-virt/Taskfile.yml "$@"` |
 
-**Prerequisites:** `curl`, `tar`, and [Task](https://taskfile.dev). The installer will warn if `task` isn't on your PATH.
+### Prerequisite — install Task
+
+`quick-virt` is a thin wrapper around the [**Task**](https://taskfile.dev) runner (`go-task`), so you must install `task` first — without it the CLI won't run.
+
+```bash
+# Install into ~/.local/bin (make sure it's on your PATH):
+sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
+```
+
+Other install methods (Homebrew, Snap, apt/dnf packages, Go, etc.) are documented at the official page:
+
+- **Installation guide:** https://taskfile.dev/installation/
+- **Project site:** https://taskfile.dev
+
+Verify it's available:
+
+```bash
+task --version
+```
+
+Other prerequisites: `curl` and `tar` (used by `install.sh`). The installer also warns if `task` isn't on your PATH.
 
 **Usage:**
 
 ```bash
-quick-virt --list                          # list all available tasks
+quick-virt                                 # grouped help with examples (same as: quick-virt help)
+quick-virt --list                          # full, flat list of all tasks
 quick-virt setup:install-kvm               # install KVM + libvirt
 quick-virt setup:install-nfs-server        # install NFS server
 quick-virt images:download:ubuntu22        # download Ubuntu 22.04 cloud image
@@ -63,6 +84,20 @@ quick-virt self:version       # show installed version
 quick-virt self:update        # re-install the latest tag
 quick-virt self:uninstall     # remove
 ```
+
+**How to update:**
+
+> [!TIP]
+> `self:update` re-runs the installer and overwrites the Taskfile, scripts, and the `quick-virt` wrapper in place. Your VMs, networks, images, and Terraform projects are untouched.
+
+| Goal | Command |
+|------|---------|
+| 🟢 Update to the **latest tag** | `quick-virt self:update` |
+| 📌 Update to a **specific version** | `QV_VERSION=v0.1.8 quick-virt self:update` |
+| 🧪 Track the **development head** | `QV_VERSION=main quick-virt self:update` |
+| 🔁 Update **without the CLI** | Re-run the installer from the *Quick Install* section above |
+
+Check the result with `quick-virt self:version`.
 
 The full ordered task reference is in [`doc/SETUP.md`](./doc/SETUP.md).
 
@@ -92,6 +127,7 @@ See [`doc/MODULES.md`](./doc/MODULES.md) for module descriptions, built-in OS pr
 
 ## Documentation
 
+- [`doc/QUICK-VIRT.md`](./doc/QUICK-VIRT.md) — full `quick-virt` command reference, every command with examples
 - [`doc/SETUP.md`](./doc/SETUP.md) — Task runner installation, available tasks, and helper scripts
 - [`doc/MODULES.md`](./doc/MODULES.md) — modules, built-in OS profiles, and example walkthroughs
 - [`doc/USAGE.md`](./doc/USAGE.md) — Terraform-style module reference and feature deep dives (shared folders, OS profiles, etc.)
