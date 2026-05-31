@@ -716,6 +716,15 @@ resource "libvirt_domain" "vm" {
 
     channels = local.enable_guest_agent ? [
       {
+        # unix-socket source is REQUIRED for the qemu guest agent: without it
+        # libvirt creates the channel as type='pty', which `virsh --mode agent`
+        # and graceful agent shutdown cannot use ("guest agent is not available").
+        # mode=bind + no path -> libvirt auto-generates the socket path.
+        source = {
+          unix = {
+            mode = "bind"
+          }
+        }
         target = {
           virt_io = {
             name = "org.qemu.guest_agent.0"

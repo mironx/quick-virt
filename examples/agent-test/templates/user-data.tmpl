@@ -1,0 +1,19 @@
+#cloud-config
+# Minimal: install + enable qemu-guest-agent so it connects to the (unix) channel.
+# No package_update/upgrade -> fast boot. ASCII only.
+
+users:
+  - name: devx
+    groups: sudo
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    lock_passwd: false
+    ssh-authorized-keys:
+      - ${ssh_pub_key}
+    plain_text_passwd: 'demo123'
+
+packages:
+  - qemu-guest-agent
+
+runcmd:
+  - systemctl enable --now qemu-guest-agent
