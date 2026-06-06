@@ -1,0 +1,31 @@
+#cloud-config
+# Swap configuration fragment. Rendered by quick-vm based on var.swap_level.
+# ASCII only (cc_write_files crashes on non-ASCII chars).
+#
+# merge_how -- append lists so this does NOT replace runcmd/bootcmd
+# from base.cfg / run-before.cfg / run-after.cfg fragments.
+merge_how:
+ - name: list
+   settings: [append]
+ - name: dict
+   settings: [no_replace, recurse_list]
+
+%{ if disabled ~}
+bootcmd:
+  - swapoff -a
+  - sed -i.bak '/[ \t]swap[ \t]/s/^/#/' /etc/fstab
+%{ endif ~}
+
+write_files:
+  - path: /etc/sysctl.d/99-quick-vm-swap.conf
+    owner: root:root
+    permissions: '0644'
+    content: |
+      # Managed by quick-vm (var.swap_level=${level})
+      vm.swappiness = ${swappiness}
+
+runcmd:
+%{ if disabled ~}
+  - swapoff -a
+%{ endif ~}
+  - sysctl -p /etc/sysctl.d/99-quick-vm-swap.conf
