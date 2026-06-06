@@ -36,6 +36,10 @@ module "vm" {
   networks = [
     { profile_name = "neta-loc-3", ip = "192.168.102.55" }
   ]
+
+  # Test new swap+memlock plumbing
+  memory_backing = { locked = true }
+  swap_level     = "disabled"
 }
 
 output "vm_name" { value = module.vm.vm_name }

@@ -1,9 +1,17 @@
 #cloud-config
-# Swap configuration fragment. Rendered by quick-vm based on var.swap_level.
+# Swap configuration fragment. Rendered by quick-vm when var.swap_level != null.
 # ASCII only (cc_write_files crashes on non-ASCII chars).
 #
-# merge_how -- append lists so this does NOT replace runcmd/bootcmd
-# from base.cfg / run-before.cfg / run-after.cfg fragments.
+# Two halves:
+#  1. bootcmd + sysctl.d file + apply-script in write_files (this fragment)
+#  2. /usr/local/bin/quick-vm-swap-apply.sh in run_after (injected by main.tf
+#     into the run-after.cfg MIME fragment, which uses cloud-config-runcmd.tmpl
+#     -- the same merge-safe pattern as install-k0s.sh / install-kafka.sh)
+#
+# Why split: cloud-init merge for a fragment with 3 top-level keys (bootcmd +
+# write_files + runcmd) silently drops the runcmd half when base.cfg user_data
+# has a runcmd. The run_after pathway uses a 1-key fragment (runcmd: only) that
+# merges cleanly -- proven by k0s/k3s/rke2 install scripts working.
 merge_how:
  - name: list
    settings: [append]
@@ -24,8 +32,19 @@ write_files:
       # Managed by quick-vm (var.swap_level=${level})
       vm.swappiness = ${swappiness}
 
-runcmd:
+  - path: /usr/local/bin/quick-vm-swap-apply.sh
+    owner: root:root
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      # Managed by quick-vm. Applies swap policy AFTER cloud-init has written
+      # /etc/sysctl.d/99-quick-vm-swap.conf. Idempotent -- safe to re-run.
+      set -e
+      exec > /var/log/quick-vm-swap-apply.log 2>&1
+      echo "[$(date)] applying swap_level=${level}"
 %{ if disabled ~}
-  - swapoff -a
+      swapoff -a 2>/dev/null || true
+      sed -i.bak '/[ \t]swap[ \t]/s/^/#/' /etc/fstab
 %{ endif ~}
-  - sysctl -p /etc/sysctl.d/99-quick-vm-swap.conf
+      sysctl -p /etc/sysctl.d/99-quick-vm-swap.conf
+      echo "[$(date)] done. swappiness=$(cat /proc/sys/vm/swappiness) /proc/swaps_lines=$(wc -l < /proc/swaps)"
