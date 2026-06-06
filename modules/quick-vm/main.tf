@@ -206,14 +206,37 @@ locals {
   # 1. hostname (always, auto-generated)
   # 2. run_before (optional — commands before user_data)
   # 3. user_data (user template — users, packages, base runcmd)
-  # 4. shared-folders (auto, if shared_folders > 0 — modprobe, mkdir, mount virtiofs/9p)
-  # 5. nfs-mounts (auto, if nfs_mounts > 0 — install nfs client, mkdir, mount -a)
-  # 6. run_after (optional — commands after shared folders/nfs mount)
-  # 7. user_data_after (optional — full cloud-config after everything)
+  # 4. swap-level (optional, only when var.swap_level != null -- MUST be AFTER
+  #    user_data so that its merge_how:append dorzuca do accumulator's runcmd.
+  #    If placed before, user_data's runcmd (default replace strategy) wipes
+  #    our sysctl -p call. bootcmd/write_files merge fine regardless)
+  # 5. shared-folders (auto, if shared_folders > 0 — modprobe, mkdir, mount virtiofs/9p)
+  # 6. nfs-mounts (auto, if nfs_mounts > 0 — install nfs client, mkdir, mount -a)
+  # 7. run_after (optional — commands after shared folders/nfs mount)
+  # 8. user_data_after (optional — full cloud-config after everything)
 
   _mime_hostname = templatefile("${path.module}/templates/cloud-config-hostname.tmpl", {
     hostname = var.name
   })
+
+  # swap-level -- only when var.swap_level != null (otherwise backwards-compat,
+  # no fragment rendered). Maps level string to swappiness number and a
+  # "disabled" bool (drives bootcmd/runcmd swapoff -a + fstab cleanup).
+  _swap_swappiness_map = {
+    disabled     = 0
+    conservative = 10
+    default      = 60
+    aggressive   = 100
+  }
+  _swap_swappiness = var.swap_level != null ? local._swap_swappiness_map[var.swap_level] : 60
+
+  _mime_swap_level = var.swap_level != null ? templatefile(
+    "${path.module}/templates/cloud-config-swap-level.tmpl", {
+      level      = var.swap_level
+      swappiness = local._swap_swappiness
+      disabled   = var.swap_level == "disabled"
+    }
+  ) : ""
 
   _mime_run_before = length(var.run_before) > 0 ? templatefile(
     "${path.module}/templates/cloud-config-runcmd.tmpl", {
@@ -258,6 +281,11 @@ locals {
     [
       { filename = "base.cfg", content = trimspace(var.user_data) },
     ],
+    # swap-level MUST be after base.cfg so merge_how:append actually appends
+    # (instead of being wiped by base.cfg's default-replace runcmd merge).
+    var.swap_level != null ? [
+      { filename = "swap-level.cfg", content = trimspace(local._mime_swap_level) },
+    ] : [],
     length(var.shared_folders) > 0 ? [
       { filename = "shared-folders.cfg", content = trimspace(local._mime_shared_folders) },
     ] : [],
@@ -567,18 +595,18 @@ locals {
   # build io_tune with merge() including only fields that user set.
   _io_tune_partial = local.limits_enable_config ? {
     for dev, t in local.io_limits : dev => merge(
-      t.read_bytes_sec             == null ? {} : { read_bytes_sec             = t.read_bytes_sec },
-      t.write_bytes_sec            == null ? {} : { write_bytes_sec            = t.write_bytes_sec },
-      t.read_iops_sec              == null ? {} : { read_iops_sec              = t.read_iops_sec },
-      t.write_iops_sec             == null ? {} : { write_iops_sec             = t.write_iops_sec },
-      t.read_bytes_sec_max         == null ? {} : { read_bytes_sec_max         = t.read_bytes_sec_max },
-      t.read_bytes_sec_max_length  == null ? {} : { read_bytes_sec_max_length  = t.read_bytes_sec_max_length },
-      t.write_bytes_sec_max        == null ? {} : { write_bytes_sec_max        = t.write_bytes_sec_max },
+      t.read_bytes_sec == null ? {} : { read_bytes_sec = t.read_bytes_sec },
+      t.write_bytes_sec == null ? {} : { write_bytes_sec = t.write_bytes_sec },
+      t.read_iops_sec == null ? {} : { read_iops_sec = t.read_iops_sec },
+      t.write_iops_sec == null ? {} : { write_iops_sec = t.write_iops_sec },
+      t.read_bytes_sec_max == null ? {} : { read_bytes_sec_max = t.read_bytes_sec_max },
+      t.read_bytes_sec_max_length == null ? {} : { read_bytes_sec_max_length = t.read_bytes_sec_max_length },
+      t.write_bytes_sec_max == null ? {} : { write_bytes_sec_max = t.write_bytes_sec_max },
       t.write_bytes_sec_max_length == null ? {} : { write_bytes_sec_max_length = t.write_bytes_sec_max_length },
-      t.read_iops_sec_max          == null ? {} : { read_iops_sec_max          = t.read_iops_sec_max },
-      t.read_iops_sec_max_length   == null ? {} : { read_iops_sec_max_length   = t.read_iops_sec_max_length },
-      t.write_iops_sec_max         == null ? {} : { write_iops_sec_max         = t.write_iops_sec_max },
-      t.write_iops_sec_max_length  == null ? {} : { write_iops_sec_max_length  = t.write_iops_sec_max_length },
+      t.read_iops_sec_max == null ? {} : { read_iops_sec_max = t.read_iops_sec_max },
+      t.read_iops_sec_max_length == null ? {} : { read_iops_sec_max_length = t.read_iops_sec_max_length },
+      t.write_iops_sec_max == null ? {} : { write_iops_sec_max = t.write_iops_sec_max },
+      t.write_iops_sec_max_length == null ? {} : { write_iops_sec_max_length = t.write_iops_sec_max_length },
     ) if t != null
   } : {}
 

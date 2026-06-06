@@ -73,9 +73,9 @@ variable "extra_disks" {
     target_dev — vdb config goes to vdb's XML <iotune>, etc.
   EOT
   type = list(object({
-    target_dev = string                      # e.g. vdb, vdc — must NOT be vda (reserved for main)
-    size_gb    = number                      # disk size in GiB
-    pool       = optional(string)            # storage pool; defaults to module's storage_pool
+    target_dev = string           # e.g. vdb, vdc — must NOT be vda (reserved for main)
+    size_gb    = number           # disk size in GiB
+    pool       = optional(string) # storage pool; defaults to module's storage_pool
   }))
   default = []
 
@@ -233,7 +233,23 @@ variable "vm_profile" {
 }
 
 variable "memory_backing" {
-  description = "Memory backing configuration for the VM"
+  description = <<-EOT
+    Memory backing configuration for the VM.
+
+    `locked = true` sets <memoryBacking><locked/></memoryBacking> in the
+    libvirt domain XML -- qemu does mlockall() so this VM's RAM never lands
+    in the host's swap. Recommended for low-latency workloads (Kafka, etcd,
+    Redis, K8s control plane) and any data-plane workload that suffers from
+    swap-induced stalls.
+
+    Capacity warning: sum(locked VM memories) + headroom MUST be <= physical
+    RAM. Kernel will never reclaim locked pages -- under host memory pressure
+    the OOM killer targets other processes to keep these VMs alive.
+
+    Default is `false` (backwards-compatible -- bumping the module pin does
+    not silently change behavior for existing VMs). Opt in per distro-wrapper
+    (quick-kafka-node, quick-k0s-node, etc.) or per call.
+  EOT
   type = object({
     shared       = optional(bool, true)
     source       = optional(string)
@@ -242,6 +258,41 @@ variable "memory_backing" {
     nosharepages = optional(bool, false)
   })
   default = {}
+}
+
+variable "swap_level" {
+  description = <<-EOT
+    Swap policy inside the VM. When set to non-null, renders a cloud-init
+    MIME fragment which (a) optionally runs `swapoff -a` + masks /etc/fstab
+    swap entry in bootcmd, and (b) writes /etc/sysctl.d/99-quick-vm-swap.conf
+    with the matching vm.swappiness value (systemd-sysctl.service auto-loads
+    at boot).
+
+    Levels:
+      null         -- no swap fragment rendered (DEFAULT, backwards-compat;
+                      VM keeps cloud-image's stock swap behavior)
+      disabled     -- swapoff -a + fstab cleanup + swappiness=0
+                      (required by kubelet, recommended for Kafka, etcd,
+                       PostgreSQL, Redis)
+      conservative -- swap mounted, swappiness=10
+                      (lab dev VMs, lightweight workloads)
+      default      -- swappiness=60 (Ubuntu OOTB)
+      aggressive   -- swappiness=100 (memory-tight workloads that tolerate
+                       swap)
+
+    Independent from memory_backing.locked -- they cover different layers:
+      locked      => host can't swap qemu process (libvirt-level)
+      swap_level  => VM kernel won't swap its own pages (OS-level inside VM)
+
+    Opt in per distro-wrapper (quick-k0s-node, quick-kafka-node, etc.) or
+    per call. Default null = no behavior change vs v0.2.6.
+  EOT
+  type        = string
+  default     = null
+  validation {
+    condition     = var.swap_level == null || contains(["disabled", "conservative", "default", "aggressive"], var.swap_level)
+    error_message = "swap_level must be null or one of: disabled, conservative, default, aggressive."
+  }
 }
 
 variable "os_volume" {
