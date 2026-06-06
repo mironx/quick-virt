@@ -206,13 +206,17 @@ locals {
   # 1. hostname (always, auto-generated)
   # 2. run_before (optional — commands before user_data)
   # 3. user_data (user template — users, packages, base runcmd)
-  # 4. swap-level (optional, only when var.swap_level != null -- MUST be AFTER
-  #    user_data so that its merge_how:append dorzuca do accumulator's runcmd.
-  #    If placed before, user_data's runcmd (default replace strategy) wipes
-  #    our sysctl -p call. bootcmd/write_files merge fine regardless)
+  # 4. swap-level (optional, only when var.swap_level != null) — bootcmd
+  #    swapoff + write_files (sysctl.d entry + apply script). The apply
+  #    script (sysctl -p) is queued via run_after, NOT this fragment's
+  #    runcmd, because cloud-init merge silently drops runcmd from a
+  #    3-key fragment when base.cfg has its own runcmd.
   # 5. shared-folders (auto, if shared_folders > 0 — modprobe, mkdir, mount virtiofs/9p)
   # 6. nfs-mounts (auto, if nfs_mounts > 0 — install nfs client, mkdir, mount -a)
-  # 7. run_after (optional — commands after shared folders/nfs mount)
+  # 7. run_after — combined: quick-vm internal scripts (swap-apply if
+  #    swap_level set) PREPENDED to user-supplied var.run_after. This uses
+  #    the 1-key cloud-config-runcmd.tmpl fragment which merges cleanly
+  #    (proven by install-k0s.sh / install-kafka.sh working through it).
   # 8. user_data_after (optional — full cloud-config after everything)
 
   _mime_hostname = templatefile("${path.module}/templates/cloud-config-hostname.tmpl", {
@@ -265,9 +269,20 @@ locals {
     }
   ) : ""
 
-  _mime_run_after = length(var.run_after) > 0 ? templatefile(
+  # quick-vm internal run_after scripts -- prepended BEFORE user-supplied
+  # var.run_after. The swap-apply script runs sysctl -p AFTER write_files
+  # has created /etc/sysctl.d/99-quick-vm-swap.conf, which is the only
+  # reliable kernel apply path on Ubuntu cloud-init (systemd-sysctl loaded
+  # the file's parents on T=0 before write_files existed).
+  _quick_internal_run_after = var.swap_level != null ? [
+    "/usr/local/bin/quick-vm-swap-apply.sh",
+  ] : []
+
+  _combined_run_after = concat(local._quick_internal_run_after, var.run_after)
+
+  _mime_run_after = length(local._combined_run_after) > 0 ? templatefile(
     "${path.module}/templates/cloud-config-runcmd.tmpl", {
-      commands = var.run_after
+      commands = local._combined_run_after
     }
   ) : ""
 
@@ -292,7 +307,7 @@ locals {
     length(var.nfs_mounts) > 0 ? [
       { filename = "nfs-mounts.cfg", content = trimspace(local._mime_nfs_mounts) },
     ] : [],
-    length(var.run_after) > 0 ? [
+    length(local._combined_run_after) > 0 ? [
       { filename = "run-after.cfg", content = trimspace(local._mime_run_after) },
     ] : [],
     var.user_data_after != null ? [
