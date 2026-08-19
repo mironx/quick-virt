@@ -16,16 +16,18 @@ quick-virt/
 │   ├── quick-access-hosts/       # Render /etc/hosts-style file
 │   └── quick-access-ansible/     # Render Ansible inventory.ini (+ helpers/)
 ├── examples/                     # Usage examples
-│   ├── example1-network/         # Create KVM networks
-│   ├── example2-kvm-network-reader/ # Read and display network parameters
-│   ├── example3a-vm/             # Single VM (profile via reader)
-│   ├── example3b-vm/             # Single VM (with profile_name)
-│   ├── example3c-vm/             # OS image modes (os_volume, os_name, os_profile)
-│   ├── example3d-vm/             # Single VM extras
-│   ├── example4-vms/             # Multi-VM cluster setup (masters + workers)
-│   ├── example5-vms/             # Multiple quick-vms sharing one base volume
-│   ├── example6-vms/             # Resource limits — two paths (enable_config XML inject + quick-throttle* triplet)
-│   └── example7-vms/             # Cluster + access helpers (ssh / hosts / ansible)
+│   ├── prerequisites/
+│   │   └── 01-networks-nat-bridge/ # Create KVM networks (required before any VM example)
+│   ├── 01-network-reader-info/   # Read and display network parameters
+│   ├── 02a-vm-network-variants/  # Single VM (profile via reader)
+│   ├── 02b-vm-custom-storage/    # Single VM (with profile_name)
+│   ├── 02c-vm-os-image-modes/    # OS image modes (os_volume, os_name, os_profile)
+│   ├── 02d-vm-nfs-mounts/        # One VM per OS, all mounting the same NFS share
+│   ├── 03-vms-masters-workers/   # Multi-VM cluster setup (masters + workers)
+│   ├── 04-vms-shared-os-volume/  # Multiple quick-vms sharing one base volume
+│   ├── 05-vms-throttle-limits/   # Resource limits — two paths (enable_config XML inject + quick-throttle* triplet)
+│   ├── 06-vms-access-helpers/    # Cluster + access helpers (ssh / hosts / ansible)
+│   └── 07-vm-guest-agent/        # qemu-guest-agent virtio channel auto-attach demo
 ├── scripts/                      # Helper shell scripts
 │   ├── setup/                    # System setup scripts
 │   ├── linux-bridge/             # Bridge management scripts

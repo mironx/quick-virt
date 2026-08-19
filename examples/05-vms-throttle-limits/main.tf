@@ -11,7 +11,7 @@ provider "libvirt" {
 }
 
 # ==============================================================================
-# example6-vms — resource limits — TWO PATHS demonstrated
+# 05-vms-throttle-limits — resource limits — TWO PATHS demonstrated
 #
 # Path A (KVM-API XML inject, terraform-driven, persistent at boot)
 #   vm_loose     → no limits (baseline for comparison)

@@ -32,7 +32,7 @@ note "   sh -c \"\$(curl --location https://taskfile.dev/install.sh)\" -- -d -b 
 note "1. $CMD setup:install-kvm                 # KVM + libvirt (once per host)"
 note "2. $CMD images:download:ubuntu22          # an OS cloud image"
 note "3. $CMD scaffold:init-networks DIR=./net  # then: cd net && terraform init && terraform apply"
-note "4. apply a VM example (examples/example3a-vm) or use the quick-vm module"
+note "4. apply a VM example (examples/02a-vm-network-variants) or use the quick-vm module"
 
 hdr "1. Host setup — must have"
 row "setup:install-kvm"                "Install KVM, libvirt and helpers (run first)"

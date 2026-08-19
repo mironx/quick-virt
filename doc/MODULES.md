@@ -54,12 +54,12 @@ The [`examples`](../examples) directory demonstrates how to use the modules:
 
 | Example | Description |
 |---------|-------------|
-| [`example1-network`](../examples/example1-network) | Create KVM networks (NAT + bridge) |
-| [`example2-kvm-network-reader`](../examples/example2-kvm-network-reader) | Read and display network parameters |
-| [`example3a-vm`](../examples/example3a-vm) | Single VMs with various network configs (static, DHCP, profile_name) |
-| [`example3b-vm`](../examples/example3b-vm) | Single VMs with custom storage and network configs |
-| [`example3c-vm`](../examples/example3c-vm) | OS image modes: shared os_volume, standalone os_name, custom os_profile |
-| [`example4-vms`](../examples/example4-vms) | Multiple VMs (masters + workers) with quick-vms |
-| [`example5-vms`](../examples/example5-vms) | Multiple quick-vms instances sharing one base volume, clone vs backing_store |
-| [`example6-vms`](../examples/example6-vms) | Resource limits — demonstrates **both paths**: Path A (`enable_config` XML inject on single VM) and Path B (`quick-throttle*` triplet on a 3-node worker set with chaos workflow) |
-| [`example7-vms`](../examples/example7-vms) | Multiple quick-vms instances + standalone VM, with `quick-access-ssh`/`hosts`/`ansible` and group helpers |
+| [`prerequisites/01-networks-nat-bridge`](../examples/prerequisites/01-networks-nat-bridge) | Create KVM networks (NAT + bridge) |
+| [`01-network-reader-info`](../examples/01-network-reader-info) | Read and display network parameters |
+| [`02a-vm-network-variants`](../examples/02a-vm-network-variants) | Single VMs with various network configs (static, DHCP, profile_name) |
+| [`02b-vm-custom-storage`](../examples/02b-vm-custom-storage) | Single VMs with custom storage and network configs |
+| [`02c-vm-os-image-modes`](../examples/02c-vm-os-image-modes) | OS image modes: shared os_volume, standalone os_name, custom os_profile |
+| [`03-vms-masters-workers`](../examples/03-vms-masters-workers) | Multiple VMs (masters + workers) with quick-vms |
+| [`04-vms-shared-os-volume`](../examples/04-vms-shared-os-volume) | Multiple quick-vms instances sharing one base volume, clone vs backing_store |
+| [`05-vms-throttle-limits`](../examples/05-vms-throttle-limits) | Resource limits — demonstrates **both paths**: Path A (`enable_config` XML inject on single VM) and Path B (`quick-throttle*` triplet on a 3-node worker set with chaos workflow) |
+| [`06-vms-access-helpers`](../examples/06-vms-access-helpers) | Multiple quick-vms instances + standalone VM, with `quick-access-ssh`/`hosts`/`ansible` and group helpers |

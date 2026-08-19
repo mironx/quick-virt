@@ -83,7 +83,7 @@ module "kvm_networks" {
 }
 ```
 
-See [`examples/example1-network`](../examples/example1-network).
+See [`examples/prerequisites/01-networks-nat-bridge`](../examples/prerequisites/01-networks-nat-bridge).
 
 ---
 
@@ -135,7 +135,7 @@ Provisions one KVM domain with cloud-init, dynamic networks, shared folders, and
 **Source:** `modules/quick-vm`
 
 > ⚠️ **Prerequisite — libvirt networks must already exist.**
-> Every `profile_name` in `networks = [...]` refers to a libvirt network by name. Create them **first** with [`quick-networks`](#quick-networks--kvm-networks) (or the ready-made [`examples/example1-network`](../examples/example1-network)) — otherwise `terraform apply` fails with *"network not found"*.
+> Every `profile_name` in `networks = [...]` refers to a libvirt network by name. Create them **first** with [`quick-networks`](#quick-networks--kvm-networks) (or the ready-made [`examples/prerequisites/01-networks-nat-bridge`](../examples/prerequisites/01-networks-nat-bridge)) — otherwise `terraform apply` fails with *"network not found"*.
 
 **Inputs (most common)**
 
@@ -196,7 +196,7 @@ Provisions **sets of VMs** (e.g. `masters`, `workers`) sharing OS image, profile
 **Source:** `modules/quick-vms`
 
 > ⚠️ **Prerequisite — libvirt networks must already exist.**
-> Every key in `kvm-networks = {...}` and every `profile_name` inside a node's `networks` must match a libvirt network name. Create them **first** with [`quick-networks`](#quick-networks--kvm-networks) (or apply [`examples/example1-network`](../examples/example1-network)).
+> Every key in `kvm-networks = {...}` and every `profile_name` inside a node's `networks` must match a libvirt network name. Create them **first** with [`quick-networks`](#quick-networks--kvm-networks) (or apply [`examples/prerequisites/01-networks-nat-bridge`](../examples/prerequisites/01-networks-nat-bridge)).
 
 **Inputs**
 
@@ -270,7 +270,7 @@ module "vms" {
 }
 ```
 
-See [`examples/example4-vms`](../examples/example4-vms) and [`examples/example5-vms`](../examples/example5-vms).
+See [`examples/03-vms-masters-workers`](../examples/03-vms-masters-workers) and [`examples/04-vms-shared-os-volume`](../examples/04-vms-shared-os-volume).
 
 ---
 
@@ -297,7 +297,7 @@ Three sibling modules that **consume the VM info exposed by `quick-vm` / `quick-
 | [`quick-access-hosts`](#quick-access-hosts) | `.qv-access/hosts` | One line per VM in `/etc/hosts` format |
 | [`quick-access-ansible`](#quick-access-ansible) | `.qv-access/inventory.ini` | Ansible inventory with groups + `[all:vars]` SSH settings |
 
-> **Migration from old `.qv-ssh/` per-VM helpers:** earlier versions emitted `qv-ssh.config.<vm>.conf` from inside `quick-vm`/`quick-vms` via an `ssh = {...}` block. Both that block and the per-VM emission are **removed**. Render the access files explicitly with the modules below, fed from `module.vms.vms_info_by_set` (or `module.vm.vm_info` for a single VM). End-to-end migration is shown in [`examples/example7-vms`](../examples/example7-vms).
+> **Migration from old `.qv-ssh/` per-VM helpers:** earlier versions emitted `qv-ssh.config.<vm>.conf` from inside `quick-vm`/`quick-vms` via an `ssh = {...}` block. Both that block and the per-VM emission are **removed**. Render the access files explicitly with the modules below, fed from `module.vms.vms_info_by_set` (or `module.vm.vm_info` for a single VM). End-to-end migration is shown in [`examples/06-vms-access-helpers`](../examples/06-vms-access-helpers).
 
 #### Shared input shape — `groups`
 
@@ -490,7 +490,7 @@ module "add_extra_to_masters" {
 # module.add_extra_to_masters.groups feeds the next helper / quick-access-* module
 ```
 
-Chain these in sequence to build complex inventories (custom groups, supersets, all-nodes). End-to-end pattern in [`examples/example7-vms`](../examples/example7-vms).
+Chain these in sequence to build complex inventories (custom groups, supersets, all-nodes). End-to-end pattern in [`examples/06-vms-access-helpers`](../examples/06-vms-access-helpers).
 
 ---
 
@@ -574,7 +574,7 @@ module "vm_b" {
 
 **Why it matters:** a fresh Ubuntu image is ~600 MB. Ten VMs with `backing_store` take ~600 MB + 10 × delta. Ten VMs with `clone` take ~10 × 600 MB.
 
-See [`examples/example3c-vm`](../examples/example3c-vm) (VMs A/B/C) and [`examples/example5-vms`](../examples/example5-vms).
+See [`examples/02c-vm-os-image-modes`](../examples/02c-vm-os-image-modes) (VMs A/B/C) and [`examples/04-vms-shared-os-volume`](../examples/04-vms-shared-os-volume).
 
 ---
 
@@ -588,7 +588,7 @@ See [`examples/example3c-vm`](../examples/example3c-vm) (VMs A/B/C) and [`exampl
 **Guardrails:**
 
 - `os_volume + os_disk_mode = "clone"` is **blocked by validation** (libvirt 0.9.x file-permission limitation on root:root 600 files in the default pool).
-- Use `clone` with `os_name` or `os_profile` instead (see `examples/example5-vms` → `vms_C` / `vms_D`).
+- Use `clone` with `os_name` or `os_profile` instead (see `examples/04-vms-shared-os-volume` → `vms_C` / `vms_D`).
 
 ---
 
@@ -734,7 +734,7 @@ module "vm_with_share" {
 2. `task setup:check-shared-folders-drivers` — confirms drivers are available.
 3. The `source` directory must exist and contain a `.gitkeep` (validation checks this — the error tells you the exact command to run).
 
-See [`examples/example3c-vm`](../examples/example3c-vm) (VMs F1/F2) and [`examples/example5-vms`](../examples/example5-vms).
+See [`examples/02c-vm-os-image-modes`](../examples/02c-vm-os-image-modes) (VMs F1/F2) and [`examples/04-vms-shared-os-volume`](../examples/04-vms-shared-os-volume).
 
 ---
 
@@ -943,7 +943,7 @@ Quick-virt provides **two paths** for throttling, with different trade-offs:
 
 Both paths use the same underlying libvirt mechanisms (cgroups via `cputune` / `iotune`, traffic shaping via `<bandwidth>`). They can coexist on the same set of VMs — Path A handles VMs that should always run with a fixed throttle, Path B handles ad-hoc experimentation on top.
 
-See [`examples/example6-vms`](../examples/example6-vms) for a working side-by-side example (baseline VM + Path A throttled VM + Path B 3-node worker set).
+See [`examples/05-vms-throttle-limits`](../examples/05-vms-throttle-limits) for a working side-by-side example (baseline VM + Path A throttled VM + Path B 3-node worker set).
 
 #### Path A — `enable_config` XML inject (lightweight, terraform-driven)
 

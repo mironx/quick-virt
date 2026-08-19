@@ -84,7 +84,7 @@ terraform apply
 **Or apply the ready-made example in-repo:**
 
 ```bash
-cd examples/example1-network
+cd examples/prerequisites/01-networks-nat-bridge
 terraform init
 terraform apply -var-file=networks.auto.tfvars
 ```

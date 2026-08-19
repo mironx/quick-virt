@@ -11,7 +11,7 @@ provider "libvirt" {
 }
 
 # ==============================================================================
-# example3d-vm — one VM per OS, each mounting the same NFS share
+# 02d-vm-nfs-mounts — one VM per OS, each mounting the same NFS share
 #
 # Pre-flight on the host:
 #   task setup:install-nfs-server
@@ -38,7 +38,7 @@ locals {
   nfs_host   = "192.168.200.1"           # gateway of qvexample-neta-loc-1 == host IP on that NAT
   nfs_source = "/home/devx/vm-shares"
   nfs_target = "vm-shares"                # → mounted at /mnt/vm-shares in every VM
-  output_subdir = "example3d-vm"          # per-example subdirectory so outputs don't mix with other exampleshmmm
+  output_subdir = "02d-vm-nfs-mounts"          # per-example subdirectory so outputs don't mix with other examples
 }
 
 module "vm_ubuntu_22" {
