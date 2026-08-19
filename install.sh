@@ -100,7 +100,9 @@ if [ -z "\${QV_NO_UPDATE_CHECK:-}" ] && [ -f "\$check" ] && [[ "\${1:-}" != self
     bash "\$check" compare || true
     bash "\$check" refresh >/dev/null 2>&1 &
 fi
-exec task -t "$PREFIX/Taskfile.yml" "\$@"
+# --dir "\$PWD": run tasks relative to the user's current directory, so
+# scaffold:* output lands where the user stands, not in the install prefix.
+exec task -t "$PREFIX/Taskfile.yml" --dir "\$PWD" "\$@"
 EOF
 chmod +x "$BIN_DIR/quick-virt"
 

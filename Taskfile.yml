@@ -1,7 +1,9 @@
 version: '3'
 
 vars:
-  SCRIPTS_DIR: ./scripts
+  # Absolute so tasks work regardless of the execution directory (the installed
+  # wrapper runs with --dir "$PWD" so scaffold output lands in the user's cwd).
+  SCRIPTS_DIR: '{{.TASKFILE_DIR}}/scripts'
 
 tasks:
   # ---------------------------------------------------------------------------
