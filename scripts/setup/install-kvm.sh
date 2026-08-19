@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Script Name: 01-install-kvm.sh
+# Script Name: install-kvm.sh
 #
 # Description:
 #   This script installs KVM (Kernel-based Virtual Machine) and related packages on a Debian-based system.
@@ -8,6 +8,10 @@
 #   Finally, it installs additional packages required for modules like quick-kvm-network-reader.
 
 set -euo pipefail
+
+# The script may run under sudo (task setup:install-kvm) -- SUDO_USER then
+# holds the invoking user; fall back to the current user for direct runs.
+TARGET_USER="${SUDO_USER:-$(id -un)}"
 
 KVM_PACKAGES=(
   qemu-kvm
@@ -25,6 +29,7 @@ TOOL_PACKAGES=(
   jq
   libxml2-utils
   ipcalc
+  cpu-checker
 )
 
 echo "========================================="
@@ -38,7 +43,7 @@ echo "The following tool packages will be installed:"
 printf "  - %s\n" "${TOOL_PACKAGES[@]}"
 echo ""
 echo "Additionally:"
-echo "  - User '$(whoami)' will be added to groups: libvirt, kvm"
+echo "  - User '$TARGET_USER' will be added to groups: libvirt, kvm"
 echo "  - libvirtd service will be enabled and started"
 echo "========================================="
 echo ""
@@ -56,10 +61,10 @@ else
   echo "Skipping virt-manager."
 fi
 
-# 2. Add current user to libvirt and kvm groups
-sudo usermod -aG libvirt,kvm $(whoami)
-newgrp libvirt
-newgrp kvm
+# 2. Add the invoking user to libvirt and kvm groups
+sudo usermod -aG libvirt,kvm "$TARGET_USER"
+echo "User '$TARGET_USER' added to groups: libvirt, kvm."
+echo "NOTE: log out and back in (or run 'newgrp libvirt' in your shell) for the group change to take effect."
 
 # 3. Enable and start libvirt service
 sudo systemctl enable --now libvirtd
@@ -83,6 +88,7 @@ fi
 echo ""
 
 echo ">> Services:"
+ALL_OK=true
 SERVICES=(libvirtd virtlogd)
 for svc in "${SERVICES[@]}"; do
   STATUS=$(systemctl is-active "$svc" 2>/dev/null || true)
@@ -97,12 +103,11 @@ done
 echo ""
 
 echo ">> User groups:"
-echo "   $(groups $(whoami) 2>/dev/null)"
+echo "   $(groups "$TARGET_USER" 2>/dev/null)"
 echo ""
 
 echo ">> Installed packages:"
 ALL_PACKAGES=("${KVM_PACKAGES[@]}" "${TOOL_PACKAGES[@]}")
-ALL_OK=true
 for pkg in "${ALL_PACKAGES[@]}"; do
   if dpkg -l "$pkg" &>/dev/null; then
     echo "   [OK] $pkg"
