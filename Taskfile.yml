@@ -58,6 +58,11 @@ tasks:
     desc: Remove the quick-virt installation (prefix from this Taskfile + the quick-virt wrapper)
     cmd: |
       prefix="{{.TASKFILE_DIR}}"
+      if [ ! -f "$prefix/.version" ]; then
+        echo "[error] $prefix is not a quick-virt installation (no .version file) — refusing to remove." >&2
+        echo "        This looks like a cloned repo; delete it manually if that is really what you want." >&2
+        exit 1
+      fi
       bin="$(command -v quick-virt 2>/dev/null || echo "$HOME/.local/bin/quick-virt")"
       rm -rf "$prefix" "$bin"
       echo "[ok] quick-virt uninstalled (removed $prefix and $bin)"
