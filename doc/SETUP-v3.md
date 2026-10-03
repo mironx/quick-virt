@@ -44,8 +44,28 @@ workstation for development:
   - verify: `terraform version`
   - provider `dmacvicar/libvirt ~> 0.9` is pulled automatically by `terraform init`
 - Internet access — GitHub (installer), cloud-image mirrors (images)
+- 
+## 2. Install required software
+## 2.1 Install the KVM host stack
 
-## 2. Install the quick-virt CLI
+- `quick-virt setup:install-kvm`
+  - installs qemu-kvm, libvirt, cloud-image tools, and module helpers (jq, xmllint, ipcalc)
+  - adds your user to the `libvirt` and `kvm` groups
+  - enables and starts `libvirtd`
+- **Log out and back in** (or `newgrp libvirt`) so the group change takes effect
+- Verify:
+  - `virsh -c qemu:///system list --all` works **without sudo**
+  - `kvm-ok` reports KVM acceleration can be used
+
+## 2.2. Install Terraform
+
+@REMARK: Przenieś do punkty 1
+- Not covered by the installer — install separately (>= 1.3; >= 1.9 recommended)
+  - official apt repo / tenv / manual binary — TBD which to recommend
+- Verify: `terraform version`
+- Provider `dmacvicar/libvirt ~> 0.9` is pulled automatically by `terraform init`
+
+## 3. Install the quick-virt CLI
 
 - Install the Task runner first — quick-virt is a wrapper around it:
   - `sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin`
@@ -56,16 +76,7 @@ workstation for development:
 - Verify: `quick-virt self:version`, `quick-virt --list`
 - Alternative: clone the repo and use `task` directly from the checkout
 
-## 3. Install the KVM host stack
 
-- `quick-virt setup:install-kvm`
-  - installs qemu-kvm, libvirt, cloud-image tools, and module helpers (jq, xmllint, ipcalc)
-  - adds your user to the `libvirt` and `kvm` groups
-  - enables and starts `libvirtd`
-- **Log out and back in** (or `newgrp libvirt`) so the group change takes effect
-- Verify:
-  - `virsh -c qemu:///system list --all` works **without sudo**
-  - `kvm-ok` reports KVM acceleration can be used
 
 ## 4. Storage pool check
 
